@@ -180,6 +180,7 @@ openspec new change "<derived-name>"
 **SHOW:**
 ```
 Created: <changeRoot from status JSON>
+```
 
 The folder structure:
 ```
@@ -191,7 +192,6 @@ The folder structure:
 ```
 
 Now let's fill in the first artifact—the proposal.
-```
 
 ---
 
