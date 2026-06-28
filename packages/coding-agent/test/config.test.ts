@@ -9,6 +9,11 @@ import {
 	getUpdateInstruction,
 } from "../src/config.ts";
 
+// Running as root (uid 0) bypasses filesystem permission bits, so chmod-based
+// "not writable" assertions can't be exercised. Skip them in that case (e.g.
+// root-based container CI); GitHub Actions runs as a non-root user.
+const isRoot = process.getuid?.() === 0;
+
 const execPathDescriptor = Object.getOwnPropertyDescriptor(process, "execPath");
 const originalPath = process.env.PATH;
 const originalPiPackageDir = process.env.PI_PACKAGE_DIR;
@@ -425,7 +430,7 @@ describe("detectInstallMethod", () => {
 		});
 	});
 
-	test("does not self-update when npm install path is not writable", () => {
+	test.skipIf(isRoot)("does not self-update when npm install path is not writable", () => {
 		const { packageDir } = createNpmPrefixInstall();
 		chmodSync(packageDir, 0o500);
 
