@@ -1,6 +1,6 @@
-Pi Agent Harness - Standalone Private Copy
+Pi Agent Harness - Standalone Derivative
 
-This repository is a standalone private copy of the upstream source at:
+This repository is a public standalone derivative of the upstream source at:
 
   https://github.com/earendil-works/pi
 
@@ -12,5 +12,5 @@ The upstream project is licensed under the MIT License. See LICENSE for the
 full license text. Git history has been preserved where possible. Upstream
 issues and pull requests were not migrated.
 
-Before any public release or visibility change, re-audit license attribution,
-source provenance, GitHub Actions, and private data.
+This repository is not affiliated with or endorsed by the upstream maintainers
+unless explicitly stated.
