@@ -307,6 +307,79 @@ describe("agentLoop with AgentMessage", () => {
 		}
 	});
 
+	it("should extract text tool calls when toolCallProtocol=text", async () => {
+		const toolSchema = Type.Object({ value: Type.String() });
+		const executed: string[] = [];
+		const tool: AgentTool<typeof toolSchema, { value: string }> = {
+			name: "echo",
+			label: "Echo",
+			description: "Echo tool",
+			parameters: toolSchema,
+			async execute(_toolCallId, params) {
+				executed.push(params.value);
+				return {
+					content: [{ type: "text", text: `echoed: ${params.value}` }],
+					details: { value: params.value },
+				};
+			},
+		};
+
+		const context: AgentContext = {
+			systemPrompt: "",
+			messages: [],
+			tools: [tool],
+		};
+
+		const config: AgentLoopConfig = {
+			model: createModel(),
+			convertToLlm: identityConverter,
+			toolCallProtocol: "text",
+		};
+
+		let callIndex = 0;
+		const stream = agentLoop([createUserMessage("echo something")], context, config, undefined, () => {
+			const mockStream = new MockAssistantStream();
+			queueMicrotask(() => {
+				if (callIndex === 0) {
+					mockStream.push({
+						type: "done",
+						reason: "stop",
+						message: createAssistantMessage([
+							{
+								type: "text",
+								text: 'Need echo.\n<tool_call>{"name":"echo","arguments":{"value":"hello"}}</tool_call>',
+							},
+						]),
+					});
+				} else {
+					mockStream.push({
+						type: "done",
+						reason: "stop",
+						message: createAssistantMessage([{ type: "text", text: "done" }]),
+					});
+				}
+				callIndex++;
+			});
+			return mockStream;
+		});
+
+		for await (const _event of stream) {
+			// consume
+		}
+
+		const messages = await stream.result();
+		const firstAssistant = messages.find((message): message is AssistantMessage => message.role === "assistant");
+		const textBlocks = firstAssistant?.content.flatMap((block) => (block.type === "text" ? [block.text] : []));
+		const toolCalls = firstAssistant?.content.flatMap((block) => (block.type === "toolCall" ? [block] : []));
+
+		expect(executed).toEqual(["hello"]);
+		expect(callIndex).toBe(2);
+		expect(textBlocks).toEqual(["Need echo.\n"]);
+		expect(toolCalls).toHaveLength(1);
+		expect(toolCalls?.[0]).toMatchObject({ type: "toolCall", name: "echo", arguments: { value: "hello" } });
+		expect(messages.map((message) => message.role)).toEqual(["user", "assistant", "toolResult", "assistant"]);
+	});
+
 	it("should execute mutated beforeToolCall args without revalidation", async () => {
 		const toolSchema = Type.Object({ value: Type.String() });
 		const executed: Array<string | number> = [];
@@ -1347,5 +1420,345 @@ describe("agentLoopContinue with AgentMessage", () => {
 		const messages = await stream.result();
 		expect(messages.length).toBe(1);
 		expect(messages[0].role).toBe("assistant");
+	});
+});
+
+describe("text tool call protocol", () => {
+	const validToolCallText = '<tool_call>{"name":"testTool","arguments":{"x":1}}</tool_call>';
+	const validAssistantText = `before ${validToolCallText} after`;
+
+	type MockDoneStopReason = "length" | "stop" | "toolUse";
+
+	type TextToolCallLoopOptions = {
+		text: string;
+		toolCallProtocol?: AgentLoopConfig["toolCallProtocol"];
+		stopReason?: MockDoneStopReason;
+	};
+
+	async function runTextToolCallLoop(options: TextToolCallLoopOptions) {
+		const toolSchema = Type.Object({ x: Type.Number() });
+		const executed: number[] = [];
+		const tool: AgentTool<typeof toolSchema, { x: number }> = {
+			name: "testTool",
+			label: "Test Tool",
+			description: "Test tool",
+			parameters: toolSchema,
+			async execute(_toolCallId, params) {
+				executed.push(params.x);
+				return {
+					content: [{ type: "text", text: `result:${params.x}` }],
+					details: { x: params.x },
+				};
+			},
+		};
+
+		const context: AgentContext = {
+			systemPrompt: "",
+			messages: [],
+			tools: [tool],
+		};
+
+		const config: AgentLoopConfig = {
+			model: createModel(),
+			convertToLlm: identityConverter,
+			...(options.toolCallProtocol ? { toolCallProtocol: options.toolCallProtocol } : {}),
+		};
+
+		let callIndex = 0;
+		const events: AgentEvent[] = [];
+		const stream = agentLoop([createUserMessage("run tool")], context, config, undefined, () => {
+			const mockStream = new MockAssistantStream();
+			queueMicrotask(() => {
+				if (callIndex === 0) {
+					const stopReason = options.stopReason ?? "stop";
+					mockStream.push({
+						type: "done",
+						reason: stopReason,
+						message: createAssistantMessage([{ type: "text", text: options.text }], stopReason),
+					});
+				} else {
+					mockStream.push({
+						type: "done",
+						reason: "stop",
+						message: createAssistantMessage([{ type: "text", text: "done" }]),
+					});
+				}
+				callIndex++;
+			});
+			return mockStream;
+		});
+
+		for await (const event of stream) {
+			events.push(event);
+		}
+
+		return {
+			events,
+			messages: await stream.result(),
+			executed,
+			callIndex,
+		};
+	}
+
+	it('executes a synthetic tool call when toolCallProtocol is "text"', async () => {
+		const { events, executed } = await runTextToolCallLoop({
+			text: validAssistantText,
+			toolCallProtocol: "text",
+			stopReason: "toolUse",
+		});
+
+		const toolStart = events.find((event) => event.type === "tool_execution_start");
+		const toolEnd = events.find(
+			(event): event is Extract<AgentEvent, { type: "tool_execution_end" }> => event.type === "tool_execution_end",
+		);
+		const turnEnd = events.find(
+			(event): event is Extract<AgentEvent, { type: "turn_end" }> =>
+				event.type === "turn_end" && event.toolResults.length > 0,
+		);
+
+		expect(executed).toEqual([1]);
+		expect(toolStart).toBeDefined();
+		expect(toolEnd?.isError).toBe(false);
+		expect(turnEnd?.toolResults[0]?.content).toEqual([{ type: "text", text: "result:1" }]);
+	});
+
+	it("normalizes accepted text tool calls into tool call content", async () => {
+		const { events } = await runTextToolCallLoop({
+			text: validAssistantText,
+			toolCallProtocol: "text",
+		});
+
+		const assistantEnd = events.find(
+			(event): event is Extract<AgentEvent, { type: "message_end" }> =>
+				event.type === "message_end" && event.message.role === "assistant",
+		);
+		if (!assistantEnd || assistantEnd.message.role !== "assistant") throw new Error("expected assistant message");
+
+		const text = assistantEnd.message.content
+			.flatMap((block) => (block.type === "text" ? [block.text] : []))
+			.join("");
+		const toolCalls = assistantEnd.message.content.filter((block) => block.type === "toolCall");
+
+		expect(text).not.toContain("<tool_call>");
+		expect(toolCalls).toHaveLength(1);
+		expect(toolCalls[0]).toMatchObject({ type: "toolCall", name: "testTool", arguments: { x: 1 } });
+	});
+
+	it('executes synthetic tool calls when stopReason is "stop"', async () => {
+		const { executed, callIndex } = await runTextToolCallLoop({
+			text: validAssistantText,
+			toolCallProtocol: "text",
+			stopReason: "stop",
+		});
+
+		expect(executed).toEqual([1]);
+		expect(callIndex).toBe(2);
+	});
+
+	it("does not parse text tool calls with the native protocol", async () => {
+		const { events, messages, executed, callIndex } = await runTextToolCallLoop({
+			text: validAssistantText,
+		});
+
+		const assistant = messages.find((message): message is AssistantMessage => message.role === "assistant");
+
+		expect(executed).toEqual([]);
+		expect(callIndex).toBe(1);
+		expect(events.some((event) => event.type === "tool_execution_start")).toBe(false);
+		expect(assistant?.content).toEqual([{ type: "text", text: validAssistantText }]);
+	});
+
+	it("returns a normal error tool result for unknown tool names", async () => {
+		const { events } = await runTextToolCallLoop({
+			text: '<tool_call>{"name":"nonExistentTool","arguments":{}}</tool_call>',
+			toolCallProtocol: "text",
+		});
+
+		const toolEnd = events.find(
+			(event): event is Extract<AgentEvent, { type: "tool_execution_end" }> => event.type === "tool_execution_end",
+		);
+
+		expect(toolEnd?.isError).toBe(true);
+		expect(toolEnd?.result.content).toEqual([{ type: "text", text: "Tool nonExistentTool not found" }]);
+	});
+
+	it("leaves rejected text tool call candidates unchanged", async () => {
+		const invalidText = "before <tool_call>not valid json</tool_call> after";
+		const { events, messages, executed, callIndex } = await runTextToolCallLoop({
+			text: invalidText,
+			toolCallProtocol: "text",
+		});
+		const assistant = messages.find((message): message is AssistantMessage => message.role === "assistant");
+
+		expect(executed).toEqual([]);
+		expect(callIndex).toBe(1);
+		expect(events.some((event) => event.type === "tool_execution_start")).toBe(false);
+		expect(assistant?.content).toEqual([{ type: "text", text: invalidText }]);
+	});
+
+	it("keeps surrounding text in order around the synthetic tool call", async () => {
+		const { messages } = await runTextToolCallLoop({
+			text: validAssistantText,
+			toolCallProtocol: "text",
+		});
+		const assistant = messages.find((message): message is AssistantMessage => message.role === "assistant");
+
+		expect(assistant?.content.map((block) => block.type)).toEqual(["text", "toolCall", "text"]);
+		const textBlocks = assistant?.content.flatMap((block) => (block.type === "text" ? [block.text] : []));
+		expect(textBlocks).toEqual(["before ", " after"]);
+	});
+
+	it("normalizes a tool call split across multiple text blocks", async () => {
+		const toolSchema = Type.Object({ x: Type.Number() });
+		const executed: number[] = [];
+		const tool: AgentTool<typeof toolSchema, { x: number }> = {
+			name: "testTool",
+			label: "Test Tool",
+			description: "Test tool",
+			parameters: toolSchema,
+			async execute(_toolCallId, params) {
+				executed.push(params.x);
+				return {
+					content: [{ type: "text", text: `result:${params.x}` }],
+					details: { x: params.x },
+				};
+			},
+		};
+
+		const context: AgentContext = { systemPrompt: "", messages: [], tools: [tool] };
+		const config: AgentLoopConfig = {
+			model: createModel(),
+			convertToLlm: identityConverter,
+			toolCallProtocol: "text",
+		};
+
+		let callIndex = 0;
+		const stream = agentLoop([createUserMessage("run tool")], context, config, undefined, () => {
+			const mockStream = new MockAssistantStream();
+			queueMicrotask(() => {
+				if (callIndex === 0) {
+					// The <tool_call> tag is deliberately split across two text blocks.
+					mockStream.push({
+						type: "done",
+						reason: "stop",
+						message: createAssistantMessage([
+							{ type: "text", text: "before <tool_" },
+							{ type: "text", text: 'call>{"name":"testTool","arguments":{"x":1}}</tool_call> after' },
+						]),
+					});
+				} else {
+					mockStream.push({
+						type: "done",
+						reason: "stop",
+						message: createAssistantMessage([{ type: "text", text: "done" }]),
+					});
+				}
+				callIndex++;
+			});
+			return mockStream;
+		});
+
+		for await (const _event of stream) {
+			// consume
+		}
+
+		const messages = await stream.result();
+		const assistant = messages.find((message): message is AssistantMessage => message.role === "assistant");
+		const textBlocks = assistant?.content.flatMap((block) => (block.type === "text" ? [block.text] : []));
+		const toolCalls = assistant?.content.filter((block) => block.type === "toolCall");
+
+		expect(executed).toEqual([1]);
+		// No fragment of the raw tag (e.g. "<tool_" / "call>") may survive in any block.
+		expect(textBlocks?.join("")).not.toContain("tool_call");
+		expect(assistant?.content.map((block) => block.type)).toEqual(["text", "toolCall", "text"]);
+		expect(textBlocks).toEqual(["before ", " after"]);
+		expect(toolCalls).toHaveLength(1);
+		expect(toolCalls?.[0]).toMatchObject({ type: "toolCall", name: "testTool", arguments: { x: 1 } });
+	});
+
+	it("falls back to text extraction under auto protocol when no native call is present", async () => {
+		const { events, messages, executed, callIndex } = await runTextToolCallLoop({
+			text: validAssistantText,
+			toolCallProtocol: "auto",
+			stopReason: "stop",
+		});
+		const assistant = messages.find((message): message is AssistantMessage => message.role === "assistant");
+		const toolCalls = assistant?.content.filter((block) => block.type === "toolCall");
+
+		expect(executed).toEqual([1]);
+		expect(callIndex).toBe(2);
+		expect(events.some((event) => event.type === "tool_execution_start")).toBe(true);
+		expect(toolCalls).toHaveLength(1);
+		expect(toolCalls?.[0]?.id.startsWith("text_tool_call_")).toBe(true);
+	});
+
+	it("prefers native tool calls under auto protocol and skips text extraction", async () => {
+		const toolSchema = Type.Object({ value: Type.String() });
+		const executed: string[] = [];
+		const tool: AgentTool<typeof toolSchema, { value: string }> = {
+			name: "echo",
+			label: "Echo",
+			description: "Echo tool",
+			parameters: toolSchema,
+			async execute(_toolCallId, params) {
+				executed.push(params.value);
+				return {
+					content: [{ type: "text", text: `echoed: ${params.value}` }],
+					details: { value: params.value },
+				};
+			},
+		};
+
+		const context: AgentContext = { systemPrompt: "", messages: [], tools: [tool] };
+		const config: AgentLoopConfig = {
+			model: createModel(),
+			convertToLlm: identityConverter,
+			toolCallProtocol: "auto",
+		};
+
+		let callIndex = 0;
+		const stream = agentLoop([createUserMessage("echo something")], context, config, undefined, () => {
+			const mockStream = new MockAssistantStream();
+			queueMicrotask(() => {
+				if (callIndex === 0) {
+					// A native tool call alongside text that also contains a <tool_call> tag.
+					mockStream.push({
+						type: "done",
+						reason: "toolUse",
+						message: createAssistantMessage(
+							[
+								{
+									type: "text",
+									text: 'ignored <tool_call>{"name":"echo","arguments":{"value":"fromText"}}</tool_call>',
+								},
+								{ type: "toolCall", id: "native-1", name: "echo", arguments: { value: "fromNative" } },
+							],
+							"toolUse",
+						),
+					});
+				} else {
+					mockStream.push({
+						type: "done",
+						reason: "stop",
+						message: createAssistantMessage([{ type: "text", text: "done" }]),
+					});
+				}
+				callIndex++;
+			});
+			return mockStream;
+		});
+
+		for await (const _event of stream) {
+			// consume
+		}
+
+		const messages = await stream.result();
+		const assistant = messages.find((message): message is AssistantMessage => message.role === "assistant");
+		const toolCalls = assistant?.content.filter((block) => block.type === "toolCall");
+
+		// Only the native call ran; text extraction was skipped because a native call was present.
+		expect(executed).toEqual(["fromNative"]);
+		expect(toolCalls).toHaveLength(1);
+		expect(toolCalls?.[0]).toMatchObject({ id: "native-1", name: "echo", arguments: { value: "fromNative" } });
 	});
 });
