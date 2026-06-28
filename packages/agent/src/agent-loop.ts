@@ -291,10 +291,12 @@ async function streamAssistantResponse(
 	const llmMessages = await config.convertToLlm(messages);
 
 	// Build LLM context
+	const protocol = config.toolCallProtocol ?? "native";
+	const disableNativeTools = protocol === "auto" && config.model.capabilities?.nativeToolUse === false;
 	const llmContext: Context = {
 		systemPrompt: context.systemPrompt,
 		messages: llmMessages,
-		tools: context.tools,
+		tools: protocol === "text" || disableNativeTools ? undefined : context.tools,
 	};
 
 	const streamFunction = streamFn || streamSimple;
@@ -377,15 +379,26 @@ function applyTextToolCallExtraction(finalMessage: AssistantMessage, config: Age
 
 	// "auto" prefers provider-native tool calls and only falls back to text
 	// extraction when the provider emitted none. "text" always extracts.
-	if (protocol === "auto" && finalMessage.content.some((block) => block.type === "toolCall")) {
-		return finalMessage;
+	const diagnostics: NonNullable<AssistantMessage["diagnostics"]> = [];
+	if (protocol === "auto") {
+		if (config.model.capabilities?.nativeToolUse === false) {
+			diagnostics.push(createTextToolCallDiagnostic("text_tool_call_auto_no_native_capability"));
+		} else if (finalMessage.content.some((block) => block.type === "toolCall")) {
+			return appendTextToolCallDiagnostics(finalMessage, [
+				createTextToolCallDiagnostic("text_tool_call_ignored_native_present"),
+			]);
+		} else {
+			diagnostics.push(createTextToolCallDiagnostic("text_tool_call_auto_fallback"));
+		}
 	}
 
 	const text = finalMessage.content.flatMap((block) => (block.type === "text" ? [block.text] : [])).join("");
 	const extraction = extractTextToolCall(text);
 
-	if (extraction.kind === "none") return finalMessage;
-	if (extraction.kind === "rejected") return appendTextToolCallDiagnostics(finalMessage, extraction.diagnostics);
+	if (extraction.kind === "none") return appendTextToolCallDiagnostics(finalMessage, diagnostics);
+	if (extraction.kind === "rejected") {
+		return appendTextToolCallDiagnostics(finalMessage, [...diagnostics, ...extraction.diagnostics]);
+	}
 
 	// Extraction matched against the joined text, so removal must use absolute
 	// offsets to handle a tag split across multiple text blocks. Fall back to
@@ -395,7 +408,11 @@ function applyTextToolCallExtraction(finalMessage: AssistantMessage, config: Age
 		? spliceAcceptedTextToolCall(finalMessage.content, extraction.toolCall, span)
 		: [...finalMessage.content, extraction.toolCall];
 
-	return appendTextToolCallDiagnostics({ ...finalMessage, content }, extraction.diagnostics);
+	return appendTextToolCallDiagnostics({ ...finalMessage, content }, [...diagnostics, ...extraction.diagnostics]);
+}
+
+function createTextToolCallDiagnostic(type: string): NonNullable<AssistantMessage["diagnostics"]>[number] {
+	return { type, timestamp: Date.now() };
 }
 
 /**

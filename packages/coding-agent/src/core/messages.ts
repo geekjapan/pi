@@ -5,8 +5,13 @@
  * and provides a transformer to convert them to LLM-compatible messages.
  */
 
-import type { AgentMessage } from "@earendil-works/pi-agent-core";
+import type { AgentMessage, ToolCallProtocol } from "@earendil-works/pi-agent-core";
 import type { ImageContent, Message, TextContent } from "@earendil-works/pi-ai";
+
+type UserMessage = Extract<Message, { role: "user" }>;
+type AssistantMessage = Extract<Message, { role: "assistant" }>;
+type ToolResultMessage = Extract<Message, { role: "toolResult" }>;
+type ToolCallContent = Extract<AssistantMessage["content"][number], { type: "toolCall" }>;
 
 export const COMPACTION_SUMMARY_PREFIX = `The conversation history before this point was compacted into the following summary:
 
@@ -192,4 +197,89 @@ export function convertToLlm(messages: AgentMessage[]): Message[] {
 			}
 		})
 		.filter((m) => m !== undefined);
+}
+
+export function convertToLlmForProtocol(messages: AgentMessage[], protocol: ToolCallProtocol): Message[] {
+	const converted = convertToLlm(messages);
+	if (protocol !== "text") {
+		return converted;
+	}
+	return converted.map((message) => convertMessageToTextProtocol(message));
+}
+
+function convertMessageToTextProtocol(message: Message): Message {
+	switch (message.role) {
+		case "user":
+			return {
+				...message,
+				content: convertUserContentToTextProtocol(message.content),
+			};
+		case "assistant":
+			return {
+				...message,
+				content: message.content.map((block) => {
+					if (block.type === "toolCall") {
+						return toolCallToTextBlock(block);
+					}
+					if (block.type === "text") {
+						return { ...block, text: escapeToolProtocolTags(block.text) };
+					}
+					return { ...block };
+				}),
+			};
+		case "toolResult":
+			return toolResultToUserMessage(message);
+		default:
+			// biome-ignore lint/correctness/noSwitchDeclarations: fine
+			const _exhaustiveCheck: never = message;
+			return _exhaustiveCheck;
+	}
+}
+
+function convertUserContentToTextProtocol(content: UserMessage["content"]): UserMessage["content"] {
+	if (typeof content === "string") {
+		return escapeToolProtocolTags(content);
+	}
+	return content.map((block) =>
+		block.type === "text" ? { ...block, text: escapeToolProtocolTags(block.text) } : { ...block },
+	);
+}
+
+function toolCallToTextBlock(block: ToolCallContent): TextContent {
+	return {
+		type: "text",
+		text: `<tool_call>${JSON.stringify({ name: block.name, arguments: block.arguments })}</tool_call>`,
+	};
+}
+
+function toolResultToUserMessage(message: ToolResultMessage): UserMessage {
+	return {
+		role: "user",
+		content: [
+			{
+				type: "text",
+				text: `<tool_result tool_call_id="${escapeAttribute(message.toolCallId)}" tool_name="${escapeAttribute(message.toolName)}" is_error="${message.isError ? "true" : "false"}">${toolResultContentToText(message.content)}</tool_result>`,
+			},
+		],
+		timestamp: message.timestamp,
+	};
+}
+
+function toolResultContentToText(content: ToolResultMessage["content"]): string {
+	return content
+		.map((block) => {
+			if (block.type === "image") {
+				return `[Image: ${block.mimeType}]`;
+			}
+			return escapeToolProtocolTags(block.text);
+		})
+		.join("\n");
+}
+
+function escapeToolProtocolTags(text: string): string {
+	return text.replace(/<\/?tool_call>|<\/?tool_result>/g, (tag) => tag.replace(/</g, "&lt;").replace(/>/g, "&gt;"));
+}
+
+function escapeAttribute(text: string): string {
+	return text.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }

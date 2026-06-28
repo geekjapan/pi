@@ -908,8 +908,14 @@ export class AgentSession {
 	private _rebuildSystemPrompt(toolNames: string[]): string {
 		const validToolNames = toolNames.filter((name) => this._toolRegistry.has(name));
 		const toolSnippets: Record<string, string> = {};
+		const toolSchemas: Record<string, unknown> = {};
 		const promptGuidelines: string[] = [];
 		for (const name of validToolNames) {
+			const definition = this._toolDefinitions.get(name)?.definition;
+			if (definition) {
+				toolSchemas[name] = definition.parameters;
+			}
+
 			const snippet = this._toolPromptSnippets.get(name);
 			if (snippet) {
 				toolSnippets[name] = snippet;
@@ -936,6 +942,8 @@ export class AgentSession {
 			appendSystemPrompt,
 			selectedTools: validToolNames,
 			toolSnippets,
+			toolSchemas,
+			toolCallProtocol: this.agent.toolCallProtocol,
 			promptGuidelines,
 		};
 		return buildSystemPrompt(this._baseSystemPromptOptions);

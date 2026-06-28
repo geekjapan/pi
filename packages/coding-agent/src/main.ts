@@ -8,7 +8,7 @@
 import { createInterface } from "node:readline";
 import { type ImageContent, modelsAreEqual } from "@earendil-works/pi-ai";
 import chalk from "chalk";
-import { type Args, type Mode, parseArgs, printHelp } from "./cli/args.ts";
+import { type Args, isValidToolProtocol, type Mode, parseArgs, printHelp } from "./cli/args.ts";
 import { processFileArguments } from "./cli/file-processor.ts";
 import { buildInitialMessage } from "./cli/initial-message.ts";
 import { listModels } from "./cli/list-models.ts";
@@ -417,6 +417,9 @@ function buildSessionOptions(
 	if (parsed.thinking) {
 		options.thinkingLevel = parsed.thinking;
 	}
+	if (parsed.toolProtocol && isValidToolProtocol(parsed.toolProtocol)) {
+		options.toolCallProtocol = parsed.toolProtocol;
+	}
 
 	// Scoped models for Ctrl+P cycling
 	// Keep thinking level undefined when not explicitly set in the model pattern.
@@ -720,6 +723,7 @@ export async function main(args: string[], options?: MainOptions) {
 			excludeTools: sessionOptions.excludeTools,
 			noTools: sessionOptions.noTools,
 			customTools: sessionOptions.customTools,
+			toolCallProtocol: sessionOptions.toolCallProtocol,
 		});
 		const cliThinkingOverride = parsed.thinking !== undefined || cliThinkingFromModel;
 		if (created.session.model && cliThinkingOverride) {

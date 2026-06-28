@@ -150,4 +150,53 @@ describe("createAgentSession stream options", () => {
 
 		expect(options?.websocketConnectTimeoutMs).toBe(0);
 	});
+
+	it("uses native tool protocol by default", async () => {
+		const { session } = await createAgentSession({
+			cwd,
+			agentDir,
+			model: createModel("openai-completions"),
+			settingsManager: SettingsManager.inMemory(),
+			sessionManager: SessionManager.inMemory(cwd),
+		});
+
+		try {
+			expect(session.agent.toolCallProtocol).toBe("native");
+		} finally {
+			session.dispose();
+		}
+	});
+
+	it("uses tool protocol from settings", async () => {
+		const { session } = await createAgentSession({
+			cwd,
+			agentDir,
+			model: createModel("openai-completions"),
+			settingsManager: SettingsManager.inMemory({ toolProtocol: "text" }),
+			sessionManager: SessionManager.inMemory(cwd),
+		});
+
+		try {
+			expect(session.agent.toolCallProtocol).toBe("text");
+		} finally {
+			session.dispose();
+		}
+	});
+
+	it("lets explicit tool protocol override settings", async () => {
+		const { session } = await createAgentSession({
+			cwd,
+			agentDir,
+			model: createModel("openai-completions"),
+			toolCallProtocol: "native",
+			settingsManager: SettingsManager.inMemory({ toolProtocol: "text" }),
+			sessionManager: SessionManager.inMemory(cwd),
+		});
+
+		try {
+			expect(session.agent.toolCallProtocol).toBe("native");
+		} finally {
+			session.dispose();
+		}
+	});
 });

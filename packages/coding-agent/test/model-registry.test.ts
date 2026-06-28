@@ -441,6 +441,32 @@ describe("ModelRegistry", () => {
 			expect(compat?.cacheControlFormat).toBe("anthropic");
 		});
 
+		test("model schema preserves capability metadata", () => {
+			writeRawModelsJson({
+				demo: {
+					baseUrl: "https://example.com/v1",
+					apiKey: "DEMO_KEY",
+					api: "openai-completions",
+					models: [
+						{
+							id: "demo-model",
+							reasoning: false,
+							input: ["text"],
+							capabilities: { nativeToolUse: false },
+							cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+							contextWindow: 1000,
+							maxTokens: 100,
+						},
+					],
+				},
+			});
+
+			const registry = ModelRegistry.create(authStorage, modelsJsonPath);
+
+			expect(registry.getError()).toBeUndefined();
+			expect(registry.find("demo", "demo-model")?.capabilities).toEqual({ nativeToolUse: false });
+		});
+
 		test("compat schema accepts chat template thinking configuration", () => {
 			writeRawModelsJson({
 				demo: {
@@ -800,6 +826,23 @@ describe("ModelRegistry", () => {
 			expect(sonnet?.cost.input).toBe(99);
 			// Other cost fields should be preserved from built-in
 			expect(sonnet?.cost.output).toBeGreaterThan(0);
+		});
+
+		test("model override can set capability metadata", () => {
+			writeRawModelsJson({
+				openrouter: {
+					modelOverrides: {
+						"anthropic/claude-sonnet-4": {
+							capabilities: { nativeToolUse: false },
+						},
+					},
+				},
+			});
+
+			const registry = ModelRegistry.create(authStorage, modelsJsonPath);
+			const sonnet = getModelsForProvider(registry, "openrouter").find((m) => m.id === "anthropic/claude-sonnet-4");
+
+			expect(sonnet?.capabilities).toEqual({ nativeToolUse: false });
 		});
 
 		test("model override can add headers at request time", async () => {
@@ -1187,6 +1230,28 @@ describe("ModelRegistry", () => {
 					"custom-a",
 					"custom-b",
 				]);
+			});
+
+			test("registered provider models preserve capability metadata", () => {
+				const registry = ModelRegistry.create(authStorage, modelsJsonPath);
+
+				registry.registerProvider("custom-provider", {
+					...providerConfig("https://custom.test/v1", [{ id: "custom-a" }], "openai-completions"),
+					models: [
+						{
+							id: "custom-a",
+							name: "custom-a",
+							reasoning: false,
+							input: ["text"],
+							capabilities: { nativeToolUse: false },
+							cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+							contextWindow: 100000,
+							maxTokens: 8000,
+						},
+					],
+				});
+
+				expect(registry.find("custom-provider", "custom-a")?.capabilities).toEqual({ nativeToolUse: false });
 			});
 
 			test("baseUrl-only override keeps custom provider models after refresh", () => {

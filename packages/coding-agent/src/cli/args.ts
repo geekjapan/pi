@@ -2,7 +2,7 @@
  * CLI argument parsing and help display
  */
 
-import type { ThinkingLevel } from "@earendil-works/pi-agent-core";
+import type { ThinkingLevel, ToolCallProtocol } from "@earendil-works/pi-agent-core";
 import chalk from "chalk";
 import { APP_NAME, CONFIG_DIR_NAME, ENV_AGENT_DIR, ENV_SESSION_DIR } from "../config.ts";
 import type { ExtensionFlag } from "../core/extensions/types.ts";
@@ -16,6 +16,7 @@ export interface Args {
 	systemPrompt?: string;
 	appendSystemPrompt?: string[];
 	thinking?: ThinkingLevel;
+	toolProtocol?: string;
 	continue?: boolean;
 	resume?: boolean;
 	help?: boolean;
@@ -55,9 +56,14 @@ export interface Args {
 }
 
 const VALID_THINKING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh"] as const;
+const VALID_TOOL_PROTOCOLS = ["native", "text", "auto"] as const;
 
 export function isValidThinkingLevel(level: string): level is ThinkingLevel {
 	return VALID_THINKING_LEVELS.includes(level as ThinkingLevel);
+}
+
+export function isValidToolProtocol(protocol: string): protocol is ToolCallProtocol {
+	return VALID_TOOL_PROTOCOLS.includes(protocol as ToolCallProtocol);
 }
 
 export function parseArgs(args: string[]): Args {
@@ -135,6 +141,16 @@ export function parseArgs(args: string[]): Args {
 				result.diagnostics.push({
 					type: "warning",
 					message: `Invalid thinking level "${level}". Valid values: ${VALID_THINKING_LEVELS.join(", ")}`,
+				});
+			}
+		} else if (arg === "--tool-protocol" && i + 1 < args.length) {
+			const protocol = args[++i];
+			if (isValidToolProtocol(protocol)) {
+				result.toolProtocol = protocol;
+			} else {
+				result.diagnostics.push({
+					type: "warning",
+					message: `Invalid tool protocol "${protocol}". Valid values: ${VALID_TOOL_PROTOCOLS.join(", ")}`,
 				});
 			}
 		} else if (arg === "--print" || arg === "-p") {
@@ -259,6 +275,7 @@ ${chalk.bold("Options:")}
   --exclude-tools, -xt <tools>   Comma-separated denylist of tool names to disable
                                  Applies to built-in, extension, and custom tools
   --thinking <level>             Set thinking level: off, minimal, low, medium, high, xhigh
+  --tool-protocol <protocol>     Set tool call protocol: native, text, auto
   --extension, -e <path>         Load an extension file (can be used multiple times)
   --no-extensions, -ne           Disable extension discovery (explicit -e paths still work)
   --skill <path>                 Load a skill file or directory (can be used multiple times)

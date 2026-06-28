@@ -151,6 +151,20 @@ describe("parseArgs", () => {
 			expect(result.thinking).toBe("high");
 		});
 
+		test.each(["native", "text", "auto"] as const)("parses --tool-protocol %s", (protocol) => {
+			const result = parseArgs(["--tool-protocol", protocol]);
+			expect(result.toolProtocol).toBe(protocol);
+			expect(result.diagnostics).toEqual([]);
+		});
+
+		test("warns for invalid --tool-protocol", () => {
+			const result = parseArgs(["--tool-protocol", "xml"]);
+			expect(result.toolProtocol).toBeUndefined();
+			expect(result.diagnostics).toEqual([
+				{ type: "warning", message: 'Invalid tool protocol "xml". Valid values: native, text, auto' },
+			]);
+		});
+
 		test("parses --models as comma-separated list", () => {
 			const result = parseArgs(["--models", "gpt-4o,claude-sonnet,gemini-pro"]);
 			expect(result.models).toEqual(["gpt-4o", "claude-sonnet", "gemini-pro"]);

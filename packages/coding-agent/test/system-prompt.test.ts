@@ -1,3 +1,4 @@
+import { Type } from "typebox";
 import { describe, expect, test } from "vitest";
 import { buildSystemPrompt } from "../src/core/system-prompt.ts";
 
@@ -109,6 +110,53 @@ describe("buildSystemPrompt", () => {
 			});
 
 			expect(prompt.match(/- Use dynamic_tool for summaries\./g)).toHaveLength(1);
+		});
+	});
+
+	describe("tool call protocol", () => {
+		test("adds text protocol rules and compact schemas", () => {
+			const prompt = buildSystemPrompt({
+				selectedTools: ["read", "bash"],
+				toolCallProtocol: "text",
+				toolSchemas: {
+					read: Type.Object({
+						file_path: Type.String(),
+						offset: Type.Optional(Type.Number()),
+					}),
+					bash: Type.Object({
+						command: Type.String(),
+					}),
+				},
+				contextFiles: [],
+				skills: [],
+				cwd: process.cwd(),
+			});
+
+			expect(prompt).toContain("Available tools (use <tool_call> format):");
+			expect(prompt).toContain('- read: {"file_path":"string","offset?":"number"}');
+			expect(prompt).toContain('- bash: {"command":"string"}');
+			expect(prompt).toContain("output exactly one <tool_call>");
+			expect(prompt).toContain("Do not output <tool_result>");
+		});
+
+		test("describes text calls as fallback in auto mode", () => {
+			const prompt = buildSystemPrompt({
+				selectedTools: ["read"],
+				toolCallProtocol: "auto",
+				toolSchemas: {
+					read: Type.Object({
+						path: Type.String(),
+					}),
+				},
+				contextFiles: [],
+				skills: [],
+				cwd: process.cwd(),
+			});
+
+			expect(prompt).toContain("Prefer native Tool Use; if unavailable, use <tool_call> format as fallback.");
+			expect(prompt).toContain("Available tools for text fallback:");
+			expect(prompt).toContain('- read: {"path":"string"}');
+			expect(prompt).not.toContain("Available tools (use <tool_call> format):");
 		});
 	});
 });
