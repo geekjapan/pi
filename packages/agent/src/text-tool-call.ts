@@ -73,6 +73,16 @@ export function extractTextToolCall(textBlocks: string): TextToolCallExtractionR
 	};
 }
 
-export function removeAcceptedToolCallText(text: string): string {
-	return text.replace(FIRST_TOOL_CALL_BLOCK_PATTERN, "");
+/**
+ * Locate the first `<tool_call>...</tool_call>` span in `text`.
+ *
+ * Returns the half-open `[start, end)` character offsets of the match, or `null`
+ * when no complete block is present. Callers normalize an accepted candidate by
+ * slicing this span out of the joined assistant text, which keeps the removal
+ * correct even when the tag is split across multiple text content blocks.
+ */
+export function findToolCallSpan(text: string): { start: number; end: number } | null {
+	const match = text.match(FIRST_TOOL_CALL_BLOCK_PATTERN);
+	if (!match || match.index === undefined) return null;
+	return { start: match.index, end: match.index + match[0].length };
 }

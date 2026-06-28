@@ -145,7 +145,7 @@ export interface AgentLoopConfig extends SimpleStreamOptions {
 	 * Tool call protocol mode.
 	 * - "native": only provider-native tool calls are executed (default)
 	 * - "text": parse assistant text for <tool_call> tags and create synthetic tool calls
-	 * - "auto": try native first, fall back to text extraction (future)
+	 * - "auto": execute provider-native tool calls when present, otherwise fall back to text extraction
 	 */
 	toolCallProtocol?: ToolCallProtocol;
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { extractTextToolCall, removeAcceptedToolCallText } from "../src/text-tool-call.ts";
+import { extractTextToolCall, findToolCallSpan } from "../src/text-tool-call.ts";
 
 function expectRejectedDiagnostic(text: string, type: string): void {
 	const result = extractTextToolCall(text);
@@ -69,12 +69,30 @@ describe("extractTextToolCall", () => {
 	});
 });
 
-describe("removeAcceptedToolCallText", () => {
-	it("removes the accepted tool call text and preserves surrounding text", () => {
-		expect(
-			removeAcceptedToolCallText(
-				'before <tool_call>{"name":"read","arguments":{"path":"package.json"}}</tool_call> after',
-			),
-		).toBe("before  after");
+describe("findToolCallSpan", () => {
+	it("returns the offsets of the tool call block", () => {
+		const text = 'before <tool_call>{"name":"read","arguments":{"path":"package.json"}}</tool_call> after';
+		const span = findToolCallSpan(text);
+
+		expect(span).not.toBeNull();
+		if (!span) throw new Error("expected a span");
+		expect(text.slice(span.start, span.end)).toBe(
+			'<tool_call>{"name":"read","arguments":{"path":"package.json"}}</tool_call>',
+		);
+		expect(text.slice(0, span.start)).toBe("before ");
+		expect(text.slice(span.end)).toBe(" after");
+	});
+
+	it("matches only the first block when several are present", () => {
+		const text =
+			'<tool_call>{"name":"a","arguments":{}}</tool_call><tool_call>{"name":"b","arguments":{}}</tool_call>';
+		const span = findToolCallSpan(text);
+
+		expect(span).toEqual({ start: 0, end: '<tool_call>{"name":"a","arguments":{}}</tool_call>'.length });
+	});
+
+	it("returns null when there is no complete block", () => {
+		expect(findToolCallSpan("no tool call here")).toBeNull();
+		expect(findToolCallSpan("<tool_call>{unterminated")).toBeNull();
 	});
 });
