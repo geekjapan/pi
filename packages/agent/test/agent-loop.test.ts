@@ -1431,6 +1431,7 @@ describe("text tool call protocol", () => {
 
 	type TextToolCallLoopOptions = {
 		text: string;
+		model?: Model<"openai-responses">;
 		toolCallProtocol?: AgentLoopConfig["toolCallProtocol"];
 		stopReason?: MockDoneStopReason;
 	};
@@ -1459,14 +1460,16 @@ describe("text tool call protocol", () => {
 		};
 
 		const config: AgentLoopConfig = {
-			model: createModel(),
+			model: options.model ?? createModel(),
 			convertToLlm: identityConverter,
 			...(options.toolCallProtocol ? { toolCallProtocol: options.toolCallProtocol } : {}),
 		};
 
 		let callIndex = 0;
 		const events: AgentEvent[] = [];
-		const stream = agentLoop([createUserMessage("run tool")], context, config, undefined, () => {
+		const toolCounts: Array<number | undefined> = [];
+		const stream = agentLoop([createUserMessage("run tool")], context, config, undefined, (_model, llmContext) => {
+			toolCounts.push(llmContext.tools?.length);
 			const mockStream = new MockAssistantStream();
 			queueMicrotask(() => {
 				if (callIndex === 0) {
@@ -1497,6 +1500,7 @@ describe("text tool call protocol", () => {
 			messages: await stream.result(),
 			executed,
 			callIndex,
+			toolCounts,
 		};
 	}
 
@@ -1690,6 +1694,26 @@ describe("text tool call protocol", () => {
 		expect(events.some((event) => event.type === "tool_execution_start")).toBe(true);
 		expect(toolCalls).toHaveLength(1);
 		expect(toolCalls?.[0]?.id.startsWith("text_tool_call_")).toBe(true);
+		expect(assistant?.diagnostics?.map((diagnostic) => diagnostic.type)).toContain("text_tool_call_auto_fallback");
+	});
+
+	it("falls back to text extraction under auto protocol when model has no native tool capability", async () => {
+		const model = { ...createModel(), capabilities: { nativeToolUse: false } };
+		const { events, messages, executed, callIndex, toolCounts } = await runTextToolCallLoop({
+			text: validAssistantText,
+			model,
+			toolCallProtocol: "auto",
+			stopReason: "stop",
+		});
+		const assistant = messages.find((message): message is AssistantMessage => message.role === "assistant");
+
+		expect(executed).toEqual([1]);
+		expect(callIndex).toBe(2);
+		expect(toolCounts[0]).toBeUndefined();
+		expect(events.some((event) => event.type === "tool_execution_start")).toBe(true);
+		expect(assistant?.diagnostics?.map((diagnostic) => diagnostic.type)).toContain(
+			"text_tool_call_auto_no_native_capability",
+		);
 	});
 
 	it("prefers native tool calls under auto protocol and skips text extraction", async () => {
@@ -1760,5 +1784,8 @@ describe("text tool call protocol", () => {
 		expect(executed).toEqual(["fromNative"]);
 		expect(toolCalls).toHaveLength(1);
 		expect(toolCalls?.[0]).toMatchObject({ id: "native-1", name: "echo", arguments: { value: "fromNative" } });
+		expect(assistant?.diagnostics?.map((diagnostic) => diagnostic.type)).toContain(
+			"text_tool_call_ignored_native_present",
+		);
 	});
 });

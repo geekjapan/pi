@@ -153,7 +153,7 @@ describe("buildSystemPrompt", () => {
 				cwd: process.cwd(),
 			});
 
-			expect(prompt).toContain("Prefer native tool calls when available.");
+			expect(prompt).toContain("Prefer native Tool Use; if unavailable, use <tool_call> format as fallback.");
 			expect(prompt).toContain("Available tools for text fallback:");
 			expect(prompt).toContain('- read: {"path":"string"}');
 			expect(prompt).not.toContain("Available tools (use <tool_call> format):");

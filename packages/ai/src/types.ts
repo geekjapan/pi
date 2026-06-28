@@ -676,6 +676,9 @@ export interface Model<TApi extends Api> {
 	 */
 	thinkingLevelMap?: ThinkingLevelMap;
 	input: ("text" | "image")[];
+	capabilities?: {
+		nativeToolUse?: boolean;
+	};
 	cost: {
 		input: number; // $/million tokens
 		output: number; // $/million tokens

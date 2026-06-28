@@ -151,21 +151,10 @@ describe("parseArgs", () => {
 			expect(result.thinking).toBe("high");
 		});
 
-		test.each(["native", "text"] as const)("parses --tool-protocol %s", (protocol) => {
+		test.each(["native", "text", "auto"] as const)("parses --tool-protocol %s", (protocol) => {
 			const result = parseArgs(["--tool-protocol", protocol]);
 			expect(result.toolProtocol).toBe(protocol);
 			expect(result.diagnostics).toEqual([]);
-		});
-
-		test("parses --tool-protocol auto with experimental warning", () => {
-			const result = parseArgs(["--tool-protocol", "auto"]);
-			expect(result.toolProtocol).toBe("auto");
-			expect(result.diagnostics).toEqual([
-				{
-					type: "warning",
-					message: 'Tool protocol "auto" fallback is experimental until Change #4 lands.',
-				},
-			]);
 		});
 
 		test("warns for invalid --tool-protocol", () => {

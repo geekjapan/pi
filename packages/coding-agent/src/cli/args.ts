@@ -147,12 +147,6 @@ export function parseArgs(args: string[]): Args {
 			const protocol = args[++i];
 			if (isValidToolProtocol(protocol)) {
 				result.toolProtocol = protocol;
-				if (protocol === "auto") {
-					result.diagnostics.push({
-						type: "warning",
-						message: 'Tool protocol "auto" fallback is experimental until Change #4 lands.',
-					});
-				}
 			} else {
 				result.diagnostics.push({
 					type: "warning",

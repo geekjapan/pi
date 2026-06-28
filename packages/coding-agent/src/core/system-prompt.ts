@@ -197,8 +197,8 @@ function buildToolProtocolSection(protocol: ToolCallProtocol, toolsList: string,
 - Do not output <tool_result>; tool results are provided by the system.`;
 	}
 	return `\n\nTool call fallback:
-- Prefer native tool calls when available.
-- If native tool calls are unavailable, output exactly one <tool_call>{"name":"...","arguments":{...}}</tool_call> block.
+- Prefer native Tool Use; if unavailable, use <tool_call> format as fallback.
+- To use text fallback, output exactly one <tool_call>{"name":"...","arguments":{...}}</tool_call> block.
 - Do not output <tool_result>; tool results are provided by the system.
 
 Available tools for text fallback:
