@@ -3,14 +3,14 @@
 - [ ] 1.1 Implement native-priority protocol selection for `auto`.
 - [ ] 1.2 Run strict text fallback only when no native tool calls exist.
 - [ ] 1.3 Ensure mixed native/text responses do not double execute.
-- [ ] 1.4 Add model capability metadata for native tool support and use it as an input to `auto`.
+- [ ] 1.4 Add `Model.capabilities.nativeToolUse?: boolean` metadata for native tool support and use it as an input to `auto`.
 - [ ] 1.5 Preserve manual `native` and `text` overrides even when metadata suggests another path.
 
 ## 2. Diagnostics
 
-- [ ] 2.1 Add diagnostics for invalid JSON, multiple calls, invalid shape, forged `tool_result`, and ignored text call because native was present.
+- [ ] 2.1 Add stable diagnostic codes for invalid JSON, multiple calls, invalid shape, forged `tool_result`, and ignored text call because native was present.
 - [ ] 2.2 Add diagnostics for metadata-driven protocol decisions and fallback reasons.
-- [ ] 2.3 Surface diagnostics through the existing event/logging path without adding automatic repair.
+- [ ] 2.3 Attach diagnostics to the finalized assistant message `diagnostics` field and surface them through the existing event/logging path without adding automatic repair.
 - [ ] 2.4 Document that diagnostics are observability only, not a permission system.
 
 ## 3. Verification

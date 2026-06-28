@@ -2,7 +2,7 @@
 
 ### Requirement: CLI protocol selection
 
-The coding-agent CLI SHALL accept `--tool-protocol native|text|auto` and reject other values with a diagnostic.
+The coding-agent CLI SHALL accept `--tool-protocol native|text` and reject unsupported values with a diagnostic. It SHALL accept `auto` only when auto fallback behavior is implemented in the same build; otherwise it MUST reject `auto` or mark it experimental with an explicit diagnostic.
 
 #### Scenario: Valid CLI protocol
 
@@ -13,6 +13,12 @@ The coding-agent CLI SHALL accept `--tool-protocol native|text|auto` and reject 
 
 - **WHEN** the user passes an unsupported protocol value
 - **THEN** the CLI reports a diagnostic and does not silently fall back to another protocol
+
+#### Scenario: Auto is gated before fallback exists
+
+- **WHEN** the user passes `--tool-protocol auto` before auto fallback behavior is available
+- **THEN** the CLI rejects it or reports that it is experimental
+- **AND** the session does not silently run another protocol
 
 ### Requirement: Protocol precedence
 
@@ -25,7 +31,7 @@ The effective tool call protocol MUST be resolved with precedence CLI, then sett
 
 ### Requirement: Protocol documentation
 
-The CLI help or documentation SHALL describe `native`, `text`, and `auto` and state that text protocol validation is not a sandbox.
+The CLI help or documentation SHALL describe `native`, `text`, and available `auto` behavior and state that text protocol validation is not a sandbox.
 
 #### Scenario: User reads help
 

@@ -22,6 +22,7 @@
 
 - parser/adapter は `<tool_call>` tag を 1 個だけ受理する。曖昧な自然文を実行に変換しないため。
 - JSON body は object のみ受理し、`name: string` と `arguments: object` を必須にする。既存 schema validation 前の最低限の構造検査に留めるため。
+- parser/adapter は active tool membership を検査しない。unknown/inactive name は既存 tool lookup/preflight へ渡し、通常の error tool result にするため。
 - synthetic `toolCall` は `streamAssistantResponse()` 内で final message 確定後、`message_end` emit 前に追加する。TUI、session、event stream が同じ message を見るため。
 - streaming 中に tag が分割されることは想定し、partial event では parse しない。`response.result()` で得た final message の text block を buffer として扱う。
 - parser は current assistant message の text block だけを見る。履歴、user content、tool result 内 tag を再実行しないため。

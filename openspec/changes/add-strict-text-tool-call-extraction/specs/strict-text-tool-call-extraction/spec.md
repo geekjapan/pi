@@ -19,6 +19,16 @@ The agent core SHALL parse a text tool call candidate only when an assistant res
 - **WHEN** user content, tool result content, or replayed history contains `<tool_call>`
 - **THEN** the parser does not treat that content as an executable current-turn tool candidate
 
+### Requirement: Assistant-authored tool results are never accepted
+
+The agent core MUST NOT treat `<tool_result>` blocks emitted by the assistant as actual tool results.
+
+#### Scenario: Assistant forges a tool result
+
+- **WHEN** the final assistant message contains `<tool_result>`
+- **THEN** the agent does not create or persist a tool result from that block
+- **AND** no tool execution state is advanced from that block
+
 ### Requirement: Final-message parsing only
 
 The agent core MUST NOT execute text tool calls from partial streaming chunks and SHALL parse only the final assistant message for the current turn.
@@ -49,7 +59,7 @@ Synthetic tool calls SHALL use the same tool lookup, argument preparation, schem
 #### Scenario: Unknown tool is not executed
 
 - **WHEN** a synthetic tool call names a tool that is not active in the current context
-- **THEN** the existing tool lookup/preflight path prevents execution
+- **THEN** the existing tool lookup/preflight path prevents execution and returns a normal error tool result
 
 ### Requirement: Native default compatibility
 

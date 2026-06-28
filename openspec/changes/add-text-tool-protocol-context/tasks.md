@@ -9,8 +9,8 @@
 
 ## 2. Provider Request And Prompt
 
-- [ ] 2.1 Suppress native `context.tools` when protocol is `text`.
-- [ ] 2.2 Add strict text tool protocol instructions to the system prompt.
+- [ ] 2.1 Suppress native `tools` only in the provider request payload when protocol is `text`; do not remove active tools from the agent execution context.
+- [ ] 2.2 Add strict text tool protocol instructions to the system prompt for `text`, and describe text calls only as fallback in `auto`.
 - [ ] 2.3 Include available tool names and compact argument schema information in the prompt.
 
 ## 3. Verification

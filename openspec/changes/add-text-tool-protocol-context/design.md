@@ -6,11 +6,12 @@
 
 **Goals:**
 
-- `text` protocol で native tools を provider に送らない。
+- `text` protocol で native tools を provider request payload に送らない。
+- synthetic tool call validation/execution が使う agent execution context の active tools は残す。
 - 過去の tool call と tool result を text-only provider が理解できる履歴に変換する。
 - textified 履歴を永続化せず、provider request payload のみ変換する。
 - user/tool result/history 内の tag を prompt injection として再実行しない。
-- モデルに「1 response 1 `<tool_call>`」の strict protocol を明示する。
+- `text` protocol のモデルに「1 response 1 `<tool_call>`」の strict protocol を明示する。
 
 **Non-Goals:**
 
@@ -20,7 +21,7 @@
 
 ## Decisions
 
-- `convertToLlm` は protocol-aware variant を追加し、既存関数の default 挙動は維持する。既存 provider message transform と同じ境界で処理し、session history には textified message を書き戻さない。
+- `convertToLlm` は protocol-aware variant を追加し、既存関数の default 挙動は維持する。既存 provider message transform と同じ境界で処理し、session history と agent execution context には textified message や tools omission を書き戻さない。
 - `text` protocol では `toolResult` を user text に変換する。native tool result role を使わない provider でも履歴を継続できるため。
 - assistant の synthetic/native `toolCall` 履歴は assistant text の `<tool_call>` に変換する。モデルから見る会話履歴を text protocol に統一するため。
 - tool result に画像が含まれる場合は text placeholder へ落とす。text-only protocol で binary/image payload を偽装しないため。

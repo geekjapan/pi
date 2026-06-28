@@ -2,12 +2,13 @@
 
 ### Requirement: Text protocol omits native tools
 
-When the active tool call protocol is `text`, coding-agent SHALL NOT pass native `tools` in the LLM context.
+When the active tool call protocol is `text`, coding-agent SHALL NOT pass native `tools` in the provider request payload. This MUST NOT remove active tools from the agent execution context used by synthetic tool call validation and execution.
 
 #### Scenario: Text mode provider request
 
 - **WHEN** a session runs with tool call protocol `text`
 - **THEN** the stream request sent to the provider has no native tool definitions
+- **AND** the agent execution context still has the active tools needed for synthetic tool call lookup
 
 ### Requirement: Tool history is textified
 
@@ -48,9 +49,19 @@ When text protocol conversion encounters image content in a tool result, it SHAL
 
 ### Requirement: Text protocol prompt rules
 
-When the active protocol is `text` or `auto`, the system prompt MUST include strict instructions for emitting exactly one `<tool_call>` block and not emitting `<tool_result>`.
+When the active protocol is `text`, the system prompt MUST instruct the model to emit exactly one `<tool_call>` block when it needs a tool and MUST instruct it not to emit `<tool_result>`.
 
 #### Scenario: Text tool use prompt
 
 - **WHEN** tools are available in a `text` protocol session
 - **THEN** the system prompt describes the required `<tool_call>` JSON format and lists the available tool names with compact argument schema information
+
+### Requirement: Auto prompt treats text calls as fallback
+
+When the active protocol is `auto`, the system prompt SHOULD describe `<tool_call>` as a fallback format and MUST NOT instruct native-tool-capable models to prefer text calls over native tool calls.
+
+#### Scenario: Auto tool use prompt
+
+- **WHEN** tools are available in an `auto` protocol session
+- **THEN** native tools may still be passed to the provider
+- **AND** the system prompt presents `<tool_call>` as fallback rather than the preferred tool call format

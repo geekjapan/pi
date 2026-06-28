@@ -20,7 +20,7 @@ When the active protocol is `auto`, the agent loop SHALL attempt strict text too
 
 ### Requirement: Auto mode uses capability metadata
 
-Auto mode MUST use model capability metadata as an explicit input for choosing whether to send native tools or rely on text protocol fallback.
+Model capability metadata SHALL include an optional provider-independent `capabilities.nativeToolUse` boolean. Auto mode MUST use this metadata as an explicit input for choosing whether to send native tools or rely on text protocol fallback. When omitted, auto mode SHALL preserve the current provider default behavior unless the user explicitly selects `text`.
 
 #### Scenario: Model marked without native tool support
 
@@ -34,7 +34,17 @@ Auto mode MUST use model capability metadata as an explicit input for choosing w
 
 ### Requirement: Text candidate diagnostics
 
-The agent loop MUST expose diagnostics for rejected text tool call candidates without repairing or executing them.
+The agent loop MUST attach text tool protocol diagnostics to the finalized assistant message `diagnostics` field, using stable diagnostic `type` codes suitable for tests and UI rendering. Diagnostics are observability only and MUST NOT repair or execute rejected candidates.
+
+The initial diagnostic codes SHALL include:
+
+- `text_tool_call_invalid_json`
+- `text_tool_call_multiple_candidates`
+- `text_tool_call_invalid_shape`
+- `text_tool_result_forged`
+- `text_tool_call_ignored_native_present`
+- `tool_protocol_auto_metadata_native_disabled`
+- `tool_protocol_auto_text_fallback`
 
 #### Scenario: Invalid JSON diagnostic
 
@@ -46,7 +56,13 @@ The agent loop MUST expose diagnostics for rejected text tool call candidates wi
 - **WHEN** assistant output contains `<tool_result>`
 - **THEN** the loop records a forged tool result diagnostic and does not treat it as a tool execution result
 
+#### Scenario: Native present ignores text candidate
+
+- **WHEN** auto mode sees native tool calls and a text `<tool_call>` in the same assistant response
+- **THEN** only the native calls are executed
+- **AND** the loop records `text_tool_call_ignored_native_present`
+
 #### Scenario: Fallback decision is observable
 
 - **WHEN** auto mode chooses native or text fallback because of metadata or response content
-- **THEN** diagnostics expose the decision reason without changing the canonical conversation history
+- **THEN** diagnostics expose the decision reason on the finalized assistant message without changing the canonical conversation history
