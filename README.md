@@ -1,38 +1,43 @@
-<p align="center">
-  <a href="https://pi.dev">
-    <img alt="pi logo" src="https://pi.dev/logo-auto.svg" width="128">
-  </a>
-</p>
-<p align="center">
-  <a href="https://discord.com/invite/3cU7Bz4UPx"><img alt="Discord" src="https://img.shields.io/badge/discord-community-5865F2?style=flat-square&logo=discord&logoColor=white" /></a>
-  <a href="https://www.npmjs.com/package/@earendil-works/pi-coding-agent"><img alt="npm" src="https://img.shields.io/npm/v/@earendil-works/pi-coding-agent?style=flat-square" /></a>
-</p>
-
-> New issues and PRs from new contributors are auto-closed by default. Maintainers review auto-closed issues daily. See [CONTRIBUTING.md](CONTRIBUTING.md).
-
 # Pi Agent Harness
+
+> A standalone derivative of [earendil-works/pi](https://github.com/earendil-works/pi) focused on agent harnessing,
+> text-based tool-call protocol support, and execution-side validation.
+>
+> This is not the upstream Pi project. For the upstream project, see:
+> [github.com/earendil-works/pi](https://github.com/earendil-works/pi)
 
 ## Standalone repository notice
 
-This private repository is a standalone copy of the upstream source at
-[earendil-works/pi](https://github.com/earendil-works/pi). Git history is
-preserved, upstream issues and pull requests were not migrated, and the
-upstream MIT license attribution is retained in [LICENSE](LICENSE) and
-[NOTICE](NOTICE).
+This repository is a public standalone derivative of the upstream source at
+[earendil-works/pi](https://github.com/earendil-works/pi).
 
-Before making this repository public, re-audit license attribution, provenance,
-GitHub Actions, and private data.
+Git history has been preserved where possible. Upstream issues and pull
+requests were not migrated. The upstream MIT license attribution is retained
+in [LICENSE](LICENSE) and [NOTICE](NOTICE).
 
-This is the home of the Pi agent harness project including our self extensible coding agent.
+This repository is not affiliated with or endorsed by the upstream maintainers
+unless explicitly stated.
+
+Before package publication, release tagging, or wider distribution, re-audit
+license attribution, source provenance, GitHub Actions, secrets, generated
+artifacts, and private data.
+
+## About
+
+Pi Agent Harness is a self-extensible coding agent with text tool-call protocol support for non-native tool-use models.
+
+This repository currently preserves upstream package names internally.
+Do not publish packages from this repository until package names, scopes,
+license attribution, and release provenance are reviewed.
 
 * **[@earendil-works/pi-coding-agent](packages/coding-agent)**: Interactive coding agent CLI
 * **[@earendil-works/pi-agent-core](packages/agent)**: Agent runtime with tool calling and state management
 * **[@earendil-works/pi-ai](packages/ai)**: Unified multi-provider LLM API (OpenAI, Anthropic, Google, …)
 
-To learn more about Pi:
+For the upstream project documentation:
 
-* [Visit pi.dev](https://pi.dev), the project website with demos
-* [Read the documentation](https://pi.dev/docs/latest), but you can also ask the agent to explain itself
+* [Visit pi.dev](https://pi.dev), the upstream project website
+* [Read the upstream documentation](https://pi.dev/docs/latest)
 
 ## All Packages
 
@@ -57,7 +62,7 @@ If you need stronger boundaries, containerize or sandbox Pi. See [packages/codin
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidelines and [AGENTS.md](AGENTS.md) for project-specific rules (for both humans and agents).  Longer term plans for Pi can also be found in [RFCs](https://rfc.earendil.com/keyword/pi/).
+See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidelines and [AGENTS.md](AGENTS.md) for project-specific rules (for both humans and agents). Longer term plans for the upstream Pi project can be found in [RFCs](https://rfc.earendil.com/keyword/pi/).
 
 ## Development
 
@@ -83,28 +88,6 @@ We treat npm dependency changes as reviewed code changes.
 - CI installs with `npm ci --ignore-scripts`, and a scheduled GitHub workflow runs `npm audit --omit=dev` plus `npm audit signatures --omit=dev`.
 - Shrinkwrap generation has an explicit allowlist for dependency lifecycle scripts; new lifecycle-script deps fail checks until reviewed.
 
-## Share your OSS coding agent sessions
-
-If you use Pi or other coding agents for open source work, please share your sessions.
-
-Public OSS session data helps improve coding agents with real-world tasks, tool use, failures, and fixes instead of toy benchmarks.
-
-For the full explanation, see [this post on X](https://x.com/badlogicgames/status/2037811643774652911).
-
-To publish sessions, use [`badlogic/pi-share-hf`](https://github.com/badlogic/pi-share-hf). Read its README.md for setup instructions. All you need is a Hugging Face account, the Hugging Face CLI, and `pi-share-hf`.
-
-You can also watch [this video](https://x.com/badlogicgames/status/2041151967695634619), where I show how I publish my `pi-mono` sessions.
-
-I regularly publish my own `pi-mono` work sessions here:
-
-- [badlogicgames/pi-mono on Hugging Face](https://huggingface.co/datasets/badlogicgames/pi-mono)
-
 ## License
 
-MIT
-
-<p align="center">
-  <a href="https://pi.dev">pi.dev</a> domain graciously donated by
-  <br /><br />
-  <a href="https://exe.dev"><img src="packages/coding-agent/docs/images/exy.png" alt="Exy mascot" width="48" /><br />exe.dev</a>
-</p>
+MIT — see [LICENSE](LICENSE) and [NOTICE](NOTICE) for upstream attribution.
