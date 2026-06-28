@@ -1,5 +1,6 @@
 {
 	"name": "@earendil-works/pi-coding-agent",
+	"private": true,
 	"version": "0.80.2",
 	"description": "Coding agent CLI with read, bash, edit, write tools and session management",
 	"type": "module",
