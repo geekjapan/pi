@@ -252,7 +252,7 @@ export async function createAgentSession(options: CreateAgentSessionOptions = {}
 	).filter((name) => !excludedToolNameSet?.has(name));
 
 	let agent: Agent;
-	const toolCallProtocol = options.toolCallProtocol ?? "native";
+	const toolCallProtocol = options.toolCallProtocol ?? settingsManager.getToolProtocol() ?? "native";
 
 	// Create convertToLlm wrapper that filters images if blockImages is enabled (defense-in-depth)
 	const convertToLlmWithBlockImages = (messages: AgentMessage[]): Message[] => {
