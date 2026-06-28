@@ -13,6 +13,7 @@ import type {
 	ToolResultMessage,
 } from "@earendil-works/pi-ai";
 import type { Static, TSchema } from "typebox";
+import type { ToolCallProtocol } from "./text-tool-call.ts";
 
 /**
  * Stream function used by the agent loop. `Models.streamSimple` satisfies
@@ -139,6 +140,14 @@ export interface PrepareNextTurnContext extends ShouldStopAfterTurnContext {}
 
 export interface AgentLoopConfig extends SimpleStreamOptions {
 	model: Model<any>;
+
+	/**
+	 * Tool call protocol mode.
+	 * - "native": only provider-native tool calls are executed (default)
+	 * - "text": parse assistant text for <tool_call> tags and create synthetic tool calls
+	 * - "auto": try native first, fall back to text extraction (future)
+	 */
+	toolCallProtocol?: ToolCallProtocol;
 
 	/**
 	 * Converts AgentMessage[] to LLM-compatible Message[] before each LLM call.

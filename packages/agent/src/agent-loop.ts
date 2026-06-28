@@ -3,6 +3,7 @@
  * Transforms to Message[] only at the LLM call boundary.
  */
 
+import { appendAssistantMessageDiagnostic } from "@earendil-works/pi-ai";
 import {
 	type AssistantMessage,
 	type Context,
@@ -11,6 +12,7 @@ import {
 	type ToolResultMessage,
 	validateToolArguments,
 } from "@earendil-works/pi-ai/compat";
+import { extractTextToolCall, removeAcceptedToolCallText } from "./text-tool-call.ts";
 import type {
 	AgentContext,
 	AgentEvent,
@@ -342,29 +344,64 @@ async function streamAssistantResponse(
 			case "done":
 			case "error": {
 				const finalMessage = await response.result();
+				const processedMessage = applyTextToolCallExtraction(finalMessage, config);
 				if (addedPartial) {
-					context.messages[context.messages.length - 1] = finalMessage;
+					context.messages[context.messages.length - 1] = processedMessage;
 				} else {
-					context.messages.push(finalMessage);
+					context.messages.push(processedMessage);
 				}
 				if (!addedPartial) {
-					await emit({ type: "message_start", message: { ...finalMessage } });
+					await emit({ type: "message_start", message: { ...processedMessage } });
 				}
-				await emit({ type: "message_end", message: finalMessage });
-				return finalMessage;
+				await emit({ type: "message_end", message: processedMessage });
+				return processedMessage;
 			}
 		}
 	}
 
 	const finalMessage = await response.result();
+	const processedMessage = applyTextToolCallExtraction(finalMessage, config);
 	if (addedPartial) {
-		context.messages[context.messages.length - 1] = finalMessage;
+		context.messages[context.messages.length - 1] = processedMessage;
 	} else {
-		context.messages.push(finalMessage);
-		await emit({ type: "message_start", message: { ...finalMessage } });
+		context.messages.push(processedMessage);
+		await emit({ type: "message_start", message: { ...processedMessage } });
 	}
-	await emit({ type: "message_end", message: finalMessage });
-	return finalMessage;
+	await emit({ type: "message_end", message: processedMessage });
+	return processedMessage;
+}
+
+function applyTextToolCallExtraction(finalMessage: AssistantMessage, config: AgentLoopConfig): AssistantMessage {
+	if (config.toolCallProtocol !== "text") return finalMessage;
+
+	const text = finalMessage.content.flatMap((block) => (block.type === "text" ? [block.text] : [])).join("");
+	const extraction = extractTextToolCall(text);
+
+	if (extraction.kind === "none") return finalMessage;
+	if (extraction.kind === "rejected") return appendTextToolCallDiagnostics(finalMessage, extraction.diagnostics);
+
+	const content: AssistantMessage["content"] = [
+		...finalMessage.content.map((block) => {
+			if (block.type !== "text" || !block.text.includes("<tool_call>")) return block;
+			return { ...block, text: removeAcceptedToolCallText(block.text) };
+		}),
+		extraction.toolCall,
+	];
+
+	return appendTextToolCallDiagnostics({ ...finalMessage, content }, extraction.diagnostics);
+}
+
+function appendTextToolCallDiagnostics(
+	message: AssistantMessage,
+	diagnostics: NonNullable<AssistantMessage["diagnostics"]>,
+): AssistantMessage {
+	let nextMessage = message;
+	for (const diagnostic of diagnostics) {
+		const diagnosticMessage = { ...nextMessage, diagnostics: [...(nextMessage.diagnostics ?? [])] };
+		appendAssistantMessageDiagnostic(diagnosticMessage, diagnostic);
+		nextMessage = diagnosticMessage;
+	}
+	return nextMessage;
 }
 
 /**
