@@ -294,7 +294,7 @@ async function streamAssistantResponse(
 	const llmContext: Context = {
 		systemPrompt: context.systemPrompt,
 		messages: llmMessages,
-		tools: context.tools,
+		tools: config.toolCallProtocol === "text" ? undefined : context.tools,
 	};
 
 	const streamFunction = streamFn || streamSimple;

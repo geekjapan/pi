@@ -2,6 +2,7 @@
  * System prompt construction and project context loading
  */
 
+import type { ToolCallProtocol } from "@earendil-works/pi-agent-core";
 import { getDocsPath, getExamplesPath, getReadmePath } from "../config.ts";
 import { formatSkillsForPrompt, type Skill } from "./skills.ts";
 
@@ -12,6 +13,10 @@ export interface BuildSystemPromptOptions {
 	selectedTools?: string[];
 	/** Optional one-line tool snippets keyed by tool name. */
 	toolSnippets?: Record<string, string>;
+	/** Optional parameter schemas keyed by tool name. */
+	toolSchemas?: Record<string, unknown>;
+	/** Tool call protocol used for provider requests. Default: "native". */
+	toolCallProtocol?: ToolCallProtocol;
 	/** Additional guideline bullets appended to the default system prompt guidelines. */
 	promptGuidelines?: string[];
 	/** Text to append to system prompt. */
@@ -35,6 +40,8 @@ export function buildSystemPrompt(options: BuildSystemPromptOptions): string {
 		cwd,
 		contextFiles: providedContextFiles,
 		skills: providedSkills,
+		toolSchemas,
+		toolCallProtocol = "native",
 	} = options;
 	const resolvedCwd = cwd;
 	const promptCwd = resolvedCwd.replace(/\\/g, "/");
@@ -49,12 +56,25 @@ export function buildSystemPrompt(options: BuildSystemPromptOptions): string {
 
 	const contextFiles = providedContextFiles ?? [];
 	const skills = providedSkills ?? [];
+	const tools = selectedTools || ["read", "bash", "edit", "write"];
+	const visibleTools = tools.filter((name) => !!toolSnippets?.[name]);
+	const nativeToolsList =
+		visibleTools.length > 0 ? visibleTools.map((name) => `- ${name}: ${toolSnippets![name]}`).join("\n") : "(none)";
+	const compactToolsList = compactToolList(tools, toolSchemas);
+	const toolsList = toolCallProtocol === "text" ? compactToolsList : nativeToolsList;
+	const toolProtocolSection = buildToolProtocolSection(toolCallProtocol, compactToolsList, tools.length > 0);
 
 	if (customPrompt) {
 		let prompt = customPrompt;
 
 		if (appendSection) {
 			prompt += appendSection;
+		}
+		if (toolCallProtocol === "text" && tools.length > 0) {
+			prompt += `\n\nAvailable tools (use <tool_call> format):\n${compactToolsList}`;
+		}
+		if (toolProtocolSection) {
+			prompt += toolProtocolSection;
 		}
 
 		// Append project context files
@@ -84,13 +104,6 @@ export function buildSystemPrompt(options: BuildSystemPromptOptions): string {
 	const readmePath = getReadmePath();
 	const docsPath = getDocsPath();
 	const examplesPath = getExamplesPath();
-
-	// Build tools list based on selected tools.
-	// A tool appears in Available tools only when the caller provides a one-line snippet.
-	const tools = selectedTools || ["read", "bash", "edit", "write"];
-	const visibleTools = tools.filter((name) => !!toolSnippets?.[name]);
-	const toolsList =
-		visibleTools.length > 0 ? visibleTools.map((name) => `- ${name}: ${toolSnippets![name]}`).join("\n") : "(none)";
 
 	// Build guidelines based on which tools are actually available
 	const guidelinesList: string[] = [];
@@ -129,8 +142,9 @@ export function buildSystemPrompt(options: BuildSystemPromptOptions): string {
 
 	let prompt = `You are an expert coding assistant operating inside pi, a coding agent harness. You help users by reading files, executing commands, editing code, and writing new files.
 
-Available tools:
+Available tools${toolCallProtocol === "text" ? " (use <tool_call> format)" : ""}:
 ${toolsList}
+${toolProtocolSection}
 
 In addition to the tools above, you may have access to other custom tools depending on the project.
 
@@ -170,4 +184,91 @@ Pi documentation (read only when the user asks about pi itself, its SDK, extensi
 	prompt += `\nCurrent working directory: ${promptCwd}`;
 
 	return prompt;
+}
+
+function buildToolProtocolSection(protocol: ToolCallProtocol, toolsList: string, hasTools: boolean): string {
+	if (!hasTools || protocol === "native") {
+		return "";
+	}
+	if (protocol === "text") {
+		return `\n\nTool call protocol:
+- To use a tool, output exactly one <tool_call>{"name":"...","arguments":{...}}</tool_call> block in the response.
+- JSON must be valid; name must be a string and arguments must be an object.
+- Do not output <tool_result>; tool results are provided by the system.`;
+	}
+	return `\n\nTool call fallback:
+- Prefer native tool calls when available.
+- If native tool calls are unavailable, output exactly one <tool_call>{"name":"...","arguments":{...}}</tool_call> block.
+- Do not output <tool_result>; tool results are provided by the system.
+
+Available tools for text fallback:
+${toolsList}`;
+}
+
+function compactToolList(toolNames: string[], toolSchemas: Record<string, unknown> | undefined): string {
+	if (toolNames.length === 0) {
+		return "(none)";
+	}
+	return toolNames.map((name) => `- ${name}: ${compactSchema(toolSchemas?.[name])}`).join("\n");
+}
+
+function compactSchema(schema: unknown): string {
+	const schemaObject = asSchemaObject(schema);
+	if (schemaObject?.type !== "object" || !schemaObject.properties) {
+		return "{}";
+	}
+
+	const required = new Set(readStringArray(schemaObject.required));
+	const summary = Object.fromEntries(
+		Object.entries(schemaObject.properties).map(([name, property]) => [
+			required.has(name) ? name : `${name}?`,
+			compactSchemaType(property),
+		]),
+	);
+	return JSON.stringify(summary);
+}
+
+function compactSchemaType(schema: unknown): string {
+	const schemaObject = asSchemaObject(schema);
+	if (!schemaObject) {
+		return "unknown";
+	}
+	if (schemaObject.const !== undefined) {
+		return String(schemaObject.const);
+	}
+	if (Array.isArray(schemaObject.enum)) {
+		return schemaObject.enum.map((value) => String(value)).join("|") || "unknown";
+	}
+	if (Array.isArray(schemaObject.anyOf)) {
+		return schemaObject.anyOf.map((entry) => compactSchemaType(entry)).join("|");
+	}
+	if (Array.isArray(schemaObject.oneOf)) {
+		return schemaObject.oneOf.map((entry) => compactSchemaType(entry)).join("|");
+	}
+	if (schemaObject.type === "array") {
+		return `${compactSchemaType(schemaObject.items)}[]`;
+	}
+	if (schemaObject.type === "object") {
+		return compactSchema(schema);
+	}
+	return schemaObject.type ?? "unknown";
+}
+
+interface SchemaObject {
+	type?: string;
+	properties?: Record<string, unknown>;
+	required?: unknown;
+	items?: unknown;
+	anyOf?: unknown;
+	oneOf?: unknown;
+	enum?: unknown;
+	const?: unknown;
+}
+
+function asSchemaObject(schema: unknown): SchemaObject | undefined {
+	return typeof schema === "object" && schema !== null ? (schema as SchemaObject) : undefined;
+}
+
+function readStringArray(value: unknown): string[] {
+	return Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === "string") : [];
 }
