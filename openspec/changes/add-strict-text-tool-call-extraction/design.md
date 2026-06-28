@@ -26,6 +26,29 @@
 - synthetic `toolCall` は `streamAssistantResponse()` 内で final message 確定後、`message_end` emit 前に追加する。TUI、session、event stream が同じ message を見るため。
 - streaming 中に tag が分割されることは想定し、partial event では parse しない。`response.result()` で得た final message の text block を buffer として扱う。
 - parser は current assistant message の text block だけを見る。履歴、user content、tool result 内 tag を再実行しないため。
+- synthetic `toolCall.id` は `text_tool_call_` prefix を使う。provider-native ID と区別し、tool result correlation では通常の `toolCallId` として扱うため。
+- accepted `<tool_call>` text は raw executable tag として message に残さず、synthetic `toolCall` block へ正規化する。後続 turn で raw tag が再度 provider payload に混入することと、textified history で重複することを避けるため。rejected candidate は debugging と通常表示のため text を変更しない。
+- provider が返した `stopReason` は tool execution の判定条件にしない。synthetic `toolCall` が final assistant message に追加された場合、元の stopReason が `"stop"` でも既存の `toolCall` content 判定で executor に進む。
+- parser/adapter の戻り値は P0 から structured result にする。
+
+```ts
+type TextToolCallExtractionResult =
+	| {
+			kind: "accepted";
+			toolCall: AgentToolCall;
+			diagnostics: AssistantMessageDiagnostic[];
+	  }
+	| {
+			kind: "rejected";
+			diagnostics: AssistantMessageDiagnostic[];
+	  }
+	| {
+			kind: "none";
+			diagnostics: AssistantMessageDiagnostic[];
+	  };
+```
+
+この change では diagnostics を自動修復や UI 表示の条件にしない。後続の `add-auto-tool-protocol-fallback` が同じ構造を使って fallback/rejection reason を finalized assistant message に観測可能にする。
 - protocol 型は agent core に追加するが default は `native` とする。後続 change が設定 UI/CLI を公開するまで既存挙動を固定するため。
 
 ## Risks / Trade-offs
