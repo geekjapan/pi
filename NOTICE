@@ -1,0 +1,16 @@
+Pi Agent Harness - Standalone Private Copy
+
+This repository is a standalone private copy of the upstream source at:
+
+  https://github.com/earendil-works/pi
+
+Upstream copyright:
+
+  Copyright (c) 2025 Mario Zechner
+
+The upstream project is licensed under the MIT License. See LICENSE for the
+full license text. Git history has been preserved where possible. Upstream
+issues and pull requests were not migrated.
+
+Before any public release or visibility change, re-audit license attribution,
+source provenance, GitHub Actions, and private data.

@@ -12,6 +12,17 @@
 
 # Pi Agent Harness
 
+## Standalone repository notice
+
+This private repository is a standalone copy of the upstream source at
+[earendil-works/pi](https://github.com/earendil-works/pi). Git history is
+preserved, upstream issues and pull requests were not migrated, and the
+upstream MIT license attribution is retained in [LICENSE](LICENSE) and
+[NOTICE](NOTICE).
+
+Before making this repository public, re-audit license attribution, provenance,
+GitHub Actions, and private data.
+
 This is the home of the Pi agent harness project including our self extensible coding agent.
 
 * **[@earendil-works/pi-coding-agent](packages/coding-agent)**: Interactive coding agent CLI
