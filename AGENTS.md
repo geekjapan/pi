@@ -34,6 +34,24 @@
 - For ad-hoc scripts, `write` them to a temp file (e.g. `/tmp`), run, edit if needed, remove when done. Don't embed multi-line scripts in `bash` commands.
 - Never commit unless the user asks.
 
+### Build order
+
+Packages must be built in dependency order. The `npm run build` script does this automatically:
+
+```
+tui -> ai -> agent -> coding-agent -> orchestrator
+```
+
+If building a single package manually, build its dependencies first (e.g. before building `agent`, build `ai` and `tui`).
+
+### Type checking
+
+The repo uses `tsgo` (TypeScript native preview) for type checking and builds, not the standard `tsc`. The root `tsconfig.json` is for IDE resolution; individual packages use `tsconfig.build.json`.
+
+### Formatting
+
+Biome handles linting and formatting. Key settings from `biome.json`: tabs for indentation, indent width 3, line width 120. `npm run check` runs Biome with `--write` (auto-fix) and `--error-on-warnings`.
+
 ## Dependency and Install Security
 
 - Treat npm dep and lockfile changes as reviewed code. Direct external deps stay pinned to exact versions.
