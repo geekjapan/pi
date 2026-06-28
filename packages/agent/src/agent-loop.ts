@@ -12,7 +12,7 @@ import {
 	type ToolResultMessage,
 	validateToolArguments,
 } from "@earendil-works/pi-ai/compat";
-import { extractTextToolCall, removeAcceptedToolCallText } from "./text-tool-call.ts";
+import { extractTextToolCall, findToolCallSpan } from "./text-tool-call.ts";
 import type {
 	AgentContext,
 	AgentEvent,
@@ -372,7 +372,14 @@ async function streamAssistantResponse(
 }
 
 function applyTextToolCallExtraction(finalMessage: AssistantMessage, config: AgentLoopConfig): AssistantMessage {
-	if (config.toolCallProtocol !== "text") return finalMessage;
+	const protocol = config.toolCallProtocol ?? "native";
+	if (protocol === "native") return finalMessage;
+
+	// "auto" prefers provider-native tool calls and only falls back to text
+	// extraction when the provider emitted none. "text" always extracts.
+	if (protocol === "auto" && finalMessage.content.some((block) => block.type === "toolCall")) {
+		return finalMessage;
+	}
 
 	const text = finalMessage.content.flatMap((block) => (block.type === "text" ? [block.text] : [])).join("");
 	const extraction = extractTextToolCall(text);
@@ -380,15 +387,60 @@ function applyTextToolCallExtraction(finalMessage: AssistantMessage, config: Age
 	if (extraction.kind === "none") return finalMessage;
 	if (extraction.kind === "rejected") return appendTextToolCallDiagnostics(finalMessage, extraction.diagnostics);
 
-	const content: AssistantMessage["content"] = [
-		...finalMessage.content.map((block) => {
-			if (block.type !== "text" || !block.text.includes("<tool_call>")) return block;
-			return { ...block, text: removeAcceptedToolCallText(block.text) };
-		}),
-		extraction.toolCall,
-	];
+	// Extraction matched against the joined text, so removal must use absolute
+	// offsets to handle a tag split across multiple text blocks. Fall back to
+	// appending the call only if the span is somehow not locatable.
+	const span = findToolCallSpan(text);
+	const content = span
+		? spliceAcceptedTextToolCall(finalMessage.content, extraction.toolCall, span)
+		: [...finalMessage.content, extraction.toolCall];
 
 	return appendTextToolCallDiagnostics({ ...finalMessage, content }, extraction.diagnostics);
+}
+
+/**
+ * Replace the accepted `<tool_call>` span with the synthetic tool call block.
+ *
+ * Walks the content in order, slicing the matched span out of the text blocks it
+ * covers (even across block boundaries) and inserting `toolCall` at the position
+ * where the span began, so surrounding prefix/suffix text keeps its order.
+ */
+function spliceAcceptedTextToolCall(
+	content: AssistantMessage["content"],
+	toolCall: AgentToolCall,
+	span: { start: number; end: number },
+): AssistantMessage["content"] {
+	const result: AssistantMessage["content"] = [];
+	let offset = 0;
+	let inserted = false;
+
+	for (const block of content) {
+		if (block.type !== "text") {
+			result.push(block);
+			continue;
+		}
+
+		const blockStart = offset;
+		offset += block.text.length;
+		const blockEnd = offset;
+
+		const before = block.text.slice(0, clampOffset(span.start - blockStart, block.text.length));
+		const after = block.text.slice(clampOffset(span.end - blockStart, block.text.length));
+
+		if (before.length > 0) result.push({ ...block, text: before });
+		if (!inserted && span.start < blockEnd) {
+			result.push(toolCall);
+			inserted = true;
+		}
+		if (after.length > 0) result.push({ ...block, text: after });
+	}
+
+	if (!inserted) result.push(toolCall);
+	return result;
+}
+
+function clampOffset(value: number, max: number): number {
+	return Math.min(Math.max(value, 0), max);
 }
 
 function appendTextToolCallDiagnostics(
