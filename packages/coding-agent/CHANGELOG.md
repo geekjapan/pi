@@ -8,6 +8,7 @@
 
 ### Fixed
 
+- Fixed bash command output capture to tolerate short post-exit stdio gaps from detached descendants without truncating active output ([#5303](https://github.com/earendil-works/pi/issues/5303)).
 - Fixed `--session` and `SessionManager.open()` to reject non-empty invalid session files without overwriting them ([#6002](https://github.com/earendil-works/pi/issues/6002)).
 - Fixed user-message transcript rendering to keep visible backslashes in Markdown escape sequences such as `\"` ([#6105](https://github.com/earendil-works/pi/issues/6105)).
 - Fixed assistant messages stopped by output length to show a visible incomplete-response error ([#4290](https://github.com/earendil-works/pi/issues/4290)).

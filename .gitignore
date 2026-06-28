@@ -30,6 +30,7 @@ tui-debug.log
 compaction-results/
 .opencode/
 syntax.jsonl
+graphify-out/
 out.jsonl
 pi-*.html
 out.html

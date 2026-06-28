@@ -6,7 +6,7 @@ import { spawnProcess, waitForChildProcess } from "../../../src/utils/child-proc
 /**
  * Regression test for https://github.com/earendil-works/pi/issues/5303
  *
- * waitForChildProcess armed a fixed 100ms timer on `exit` and destroyed the
+ * waitForChildProcess armed a fixed grace timer on `exit` and destroyed the
  * stdio streams when it fired. When a short-lived detached descendant kept the
  * stdout pipe open, `close` never fired, so that timer was the only thing that
  * resolved the wait, and any output written more than 100ms after exit was
@@ -33,8 +33,9 @@ describe.skipIf(process.platform === "win32")("issue #5303 bash output truncatio
 
 	it("captures output emitted after exit while a detached child holds stdout open", async () => {
 		// The shell exits immediately, but a backgrounded subshell keeps the stdout
-		// pipe open and emits ticks every 50ms, the last well past the 100ms grace.
-		const command = 'printf "HEAD\\n"; ( for i in 1 2 3 4 5 6; do sleep 0.05; printf "TICK$i\\n"; done ) &';
+		// pipe open and emits ticks below the idle grace, with the last tick well
+		// past the original exit-time grace.
+		const command = 'printf "HEAD\\n"; ( for i in 1 2 3 4 5 6 7 8; do sleep 0.1; printf "TICK$i\\n"; done ) &';
 		child = spawnProcess("/bin/sh", ["-c", command], {
 			stdio: ["ignore", "pipe", "pipe"],
 			detached: true,
@@ -49,7 +50,7 @@ describe.skipIf(process.platform === "win32")("issue #5303 bash output truncatio
 
 		expect(exitCode).toBe(0);
 		expect(output).toContain("HEAD");
-		expect(output).toContain("TICK6");
+		expect(output).toContain("TICK8");
 	});
 
 	it("resolves promptly when a detached child holds stdout open but stays quiet", async () => {
