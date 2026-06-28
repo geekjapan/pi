@@ -4,7 +4,7 @@ After text protocol support exists internally, users need a stable way to choose
 
 ## What Changes
 
-- Add `--tool-protocol native|text|auto`.
+- Add `--tool-protocol native|text|auto`, with `auto` accepted only when auto fallback behavior is implemented in the same build; otherwise reject or mark it experimental with a diagnostic.
 - Add SDK/session option and settings field for `toolProtocol`.
 - Apply precedence: CLI > settings > default `native`.
 - Keep CLI/settings exposure after core parser and text protocol context are available, so explicit `text` mode can be tested end-to-end.
@@ -20,6 +20,11 @@ After text protocol support exists internally, users need a stable way to choose
 ### Modified Capabilities
 
 なし
+
+## Dependencies / Order
+
+- 推奨実装順の 3 番目。`add-strict-text-tool-call-extraction` と `add-text-tool-protocol-context` に依存する。
+- `auto` value の安定公開は `add-auto-tool-protocol-fallback` と同時または後に行う。
 
 ## Impact
 

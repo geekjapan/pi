@@ -7,8 +7,8 @@ Some models partially support native Tool Use but occasionally fall back to text
 - Implement `auto` mode fallback behavior.
 - Prefer native `toolCall` blocks over text `<tool_call>` blocks.
 - Ignore text `<tool_call>` when native calls exist in the same assistant response.
-- Add model capability metadata so `auto` has an explicit basis for whether native Tool Use should be attempted.
-- Add parser/loop diagnostics for rejected text candidates.
+- Add provider-independent model capability metadata at `Model.capabilities.nativeToolUse` so `auto` has an explicit basis for whether native Tool Use should be attempted.
+- Add parser/loop diagnostics for rejected text candidates and fallback decisions on the finalized assistant message.
 - Avoid silent downgrade: fallback decisions must be observable.
 - Keep alias補正、JSON repair、自然文 command 推測、複数 call 実行 out of scope.
 
@@ -21,6 +21,11 @@ Some models partially support native Tool Use but occasionally fall back to text
 ### Modified Capabilities
 
 なし
+
+## Dependencies / Order
+
+- 推奨実装順の 4 番目。`add-strict-text-tool-call-extraction`、`add-text-tool-protocol-context`、`expose-tool-call-protocol-setting` に依存する。
+- `--tool-protocol auto` の安定公開はこの change と同時または後に行う。
 
 ## Impact
 

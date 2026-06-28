@@ -21,9 +21,10 @@ coding-agent には `--tools`、`--exclude-tools`、`--no-tools` など tool ava
 ## Decisions
 
 - valid values は `"native" | "text" | "auto"` のみにする。agent core と同じ型に揃えるため。
+- `auto` は fallback behavior が同じ build に含まれる場合だけ安定値として受け付ける。未実装の中間状態では reject するか experimental diagnostic を出し、silent fallback させない。
 - CLI が最優先、settings が次点、未指定時は `native` とする。既存 CLI option と同じ明示指定優先にするため。
 - docs は safety guarantee ではなく operational guidance として書く。Pi の既存 YOLO 方針と矛盾させないため。
-- `auto` を CLI value として受け付けるが、fallback 判定と diagnostics の acceptance は `add-auto-tool-protocol-fallback` 側で満たす。
+- `auto` の fallback 判定と diagnostics の acceptance は `add-auto-tool-protocol-fallback` 側で満たす。
 
 ## Risks / Trade-offs
 

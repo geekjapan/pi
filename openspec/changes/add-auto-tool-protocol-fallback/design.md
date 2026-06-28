@@ -8,7 +8,7 @@
 
 - native call がある response では native を唯一の実行対象にする。
 - native call が無い response だけ strict `<tool_call>` fallback を試す。
-- model capability metadata を使って `auto` の native/text 選択を説明可能にする。
+- provider-independent `Model.capabilities.nativeToolUse` metadata を使って `auto` の native/text 選択を説明可能にする。
 - rejected text candidate の理由を diagnostics として区別できるようにする。
 - silent fallback/downgrade を避け、fallback 理由を観測可能にする。
 
@@ -22,8 +22,9 @@
 ## Decisions
 
 - native 優先を固定する。provider が生成した structured call の方が protocol fidelity が高く、text 側との double execution を避けるため。
-- model capability metadata は既存 model metadata の近くに追加する。実行時の曖昧な検出より、明示された capability を優先するため。
-- diagnostics は実行制御と分離する。UI/ログ/テストで原因を見られるが、rejected candidate を自動修復しないため。
+- model capability metadata は既存 model metadata の近くに `capabilities?: { nativeToolUse?: boolean }` として追加する。実行時の曖昧な検出より、明示された provider-independent capability を優先するため。
+- `capabilities.nativeToolUse` が omitted の場合は、user が明示的に `text` を選ばない限り current provider default behavior を保つ。
+- diagnostics は finalized assistant message の `diagnostics` field に attach し、実行制御と分離する。UI/ログ/テストで原因を見られるが、rejected candidate を自動修復しないため。
 - `auto` prompt は text fallback の規約を含めるが、native tools は provider に渡す。native を使えるモデルには native path を優先させるため。
 
 ## Risks / Trade-offs
