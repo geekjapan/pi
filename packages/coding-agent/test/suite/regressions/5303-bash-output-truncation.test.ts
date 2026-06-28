@@ -6,7 +6,7 @@ import { spawnProcess, waitForChildProcess } from "../../../src/utils/child-proc
 /**
  * Regression test for https://github.com/earendil-works/pi/issues/5303
  *
- * waitForChildProcess armed a fixed idle timer on `exit` and destroyed the
+ * waitForChildProcess armed a fixed grace timer on `exit` and destroyed the
  * stdio streams when it fired. When a short-lived detached descendant kept the
  * stdout pipe open, `close` never fired, so that timer was the only thing that
  * resolved the wait, and any output written more than 100ms after exit was
