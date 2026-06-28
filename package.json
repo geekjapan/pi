@@ -59,6 +59,8 @@
 		"rimraf": "6.1.2",
 		"gaxios": {
 			"rimraf": "6.1.2"
-		}
+		},
+		"shell-quote": "1.8.4",
+		"undici": "8.5.0"
 	}
 }
