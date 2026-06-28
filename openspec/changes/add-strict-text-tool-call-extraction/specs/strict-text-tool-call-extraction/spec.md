@@ -21,13 +21,14 @@ The agent core SHALL parse a text tool call candidate only when an assistant res
 
 ### Requirement: Synthetic tool call identity
 
-Accepted synthetic tool calls MUST use a `toolCall.id` with a `text_tool_call_` prefix and MUST be unique within the current assistant turn.
+Accepted synthetic tool calls MUST use a `toolCall.id` with a `text_tool_call_` prefix and MUST be unique within the canonical session history.
 
 #### Scenario: Accepted synthetic id
 
 - **WHEN** a valid text tool call is accepted
 - **THEN** its synthetic tool call id starts with `text_tool_call_`
 - **AND** the id is used as the `toolCallId` for the normal tool result correlation path
+- **AND** the id does not collide with synthetic tool call ids from previous turns in the same session
 
 ### Requirement: Accepted text is normalized
 

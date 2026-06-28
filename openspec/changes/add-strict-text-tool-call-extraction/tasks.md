@@ -5,7 +5,7 @@
 - [ ] 1.3 Reject invalid JSON, multiple calls, missing `name`, non-object `arguments`, and assistant-authored `<tool_result>` without repairing or executing rejected candidates.
 - [ ] 1.4 Ensure inactive or unknown tool names are handled by the existing tool lookup/preflight path and produce a normal error tool result without execution.
 - [ ] 1.5 Ensure user content, tool result content, and replayed history tags are never parsed as current-turn executable calls.
-- [ ] 1.6 Generate accepted synthetic `toolCall.id` values with a `text_tool_call_` prefix and current-turn uniqueness.
+- [ ] 1.6 Generate accepted synthetic `toolCall.id` values with a `text_tool_call_` prefix and canonical session history uniqueness.
 
 ## 2. Agent Loop Integration
 
