@@ -346,7 +346,7 @@ async function streamAssistantResponse(
 			case "done":
 			case "error": {
 				const finalMessage = await response.result();
-				const processedMessage = applyTextToolCallExtraction(finalMessage, config);
+				const processedMessage = applyTextToolCallExtraction(finalMessage, config, context.tools ?? []);
 				if (addedPartial) {
 					context.messages[context.messages.length - 1] = processedMessage;
 				} else {
@@ -362,7 +362,7 @@ async function streamAssistantResponse(
 	}
 
 	const finalMessage = await response.result();
-	const processedMessage = applyTextToolCallExtraction(finalMessage, config);
+	const processedMessage = applyTextToolCallExtraction(finalMessage, config, context.tools ?? []);
 	if (addedPartial) {
 		context.messages[context.messages.length - 1] = processedMessage;
 	} else {
@@ -373,7 +373,11 @@ async function streamAssistantResponse(
 	return processedMessage;
 }
 
-function applyTextToolCallExtraction(finalMessage: AssistantMessage, config: AgentLoopConfig): AssistantMessage {
+function applyTextToolCallExtraction(
+	finalMessage: AssistantMessage,
+	config: AgentLoopConfig,
+	tools: AgentTool[],
+): AssistantMessage {
 	const protocol = config.toolCallProtocol ?? "native";
 	if (protocol === "native") return finalMessage;
 
@@ -393,7 +397,7 @@ function applyTextToolCallExtraction(finalMessage: AssistantMessage, config: Age
 	}
 
 	const text = finalMessage.content.flatMap((block) => (block.type === "text" ? [block.text] : [])).join("");
-	const extraction = extractTextToolCall(text);
+	const extraction = extractTextToolCall(text, { defaultName: tools.length === 1 ? tools[0].name : undefined });
 
 	if (extraction.kind === "none") return appendTextToolCallDiagnostics(finalMessage, diagnostics);
 	if (extraction.kind === "rejected") {

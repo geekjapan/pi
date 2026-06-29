@@ -1526,6 +1526,28 @@ describe("text tool call protocol", () => {
 		expect(turnEnd?.toolResults[0]?.content).toEqual([{ type: "text", text: "result:1" }]);
 	});
 
+	it("executes malformed start tag tool calls when toolCallProtocol is text", async () => {
+		const { executed, callIndex } = await runTextToolCallLoop({
+			text: 'before <tool_call{"arguments":{"x":1},"name":"testTool"}> after',
+			toolCallProtocol: "text",
+			stopReason: "stop",
+		});
+
+		expect(executed).toEqual([1]);
+		expect(callIndex).toBe(2);
+	});
+
+	it("uses the only enabled tool when a text tool call omits name", async () => {
+		const { executed, callIndex } = await runTextToolCallLoop({
+			text: 'before <tool_call{"arguments":{"x":1}}}> after',
+			toolCallProtocol: "text",
+			stopReason: "stop",
+		});
+
+		expect(executed).toEqual([1]);
+		expect(callIndex).toBe(2);
+	});
+
 	it("normalizes accepted text tool calls into tool call content", async () => {
 		const { events } = await runTextToolCallLoop({
 			text: validAssistantText,

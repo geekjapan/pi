@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- Fixed text tool call extraction to accept malformed llama.cpp tool-call text variants observed in real-provider smoke tests.
+
 ## [0.80.2] - 2026-06-23
 
 ### Changed

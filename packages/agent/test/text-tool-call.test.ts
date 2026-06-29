@@ -22,6 +22,167 @@ describe("extractTextToolCall", () => {
 		expect(result.diagnostics).toEqual([]);
 	});
 
+	it("accepts an unclosed tool_call block with JSON body prefix", () => {
+		const result = extractTextToolCall(
+			'<tool_call>\n{"name":"write","arguments":{"path":"/tmp/a","content":"ok"}}\nDONE',
+		);
+
+		expect(result.kind).toBe("accepted");
+		if (result.kind !== "accepted") throw new Error("expected accepted result");
+		expect(result.toolCall.name).toBe("write");
+		expect(result.toolCall.arguments).toEqual({ path: "/tmp/a", content: "ok" });
+	});
+
+	it("accepts an unclosed tool_call block with a name prefix and JSON arguments", () => {
+		const result = extractTextToolCall('<tool_call>read{"path":"/tmp/a"}');
+
+		expect(result.kind).toBe("accepted");
+		if (result.kind !== "accepted") throw new Error("expected accepted result");
+		expect(result.toolCall.name).toBe("read");
+		expect(result.toolCall.arguments).toEqual({ path: "/tmp/a" });
+	});
+
+	it("accepts an unclosed tool_call block with a name assignment and JSON arguments", () => {
+		const result = extractTextToolCall('<tool_call> read={"path":"/tmp/a"}');
+
+		expect(result.kind).toBe("accepted");
+		if (result.kind !== "accepted") throw new Error("expected accepted result");
+		expect(result.toolCall.name).toBe("read");
+		expect(result.toolCall.arguments).toEqual({ path: "/tmp/a" });
+	});
+
+	it("uses named top-level properties as arguments when arguments is omitted", () => {
+		const result = extractTextToolCall('<tool_call>{"name":"bash","command":"true"}</tool_call>');
+
+		expect(result.kind).toBe("accepted");
+		if (result.kind !== "accepted") throw new Error("expected accepted result");
+		expect(result.toolCall.name).toBe("bash");
+		expect(result.toolCall.arguments).toEqual({ command: "true" });
+	});
+
+	it("accepts a malformed start tag with the JSON object inside the tag", () => {
+		const result = extractTextToolCall('<tool_call{"arguments":{"path":"package.json"},"name":"read"}>');
+
+		expect(result.kind).toBe("accepted");
+		if (result.kind !== "accepted") throw new Error("expected accepted result");
+		expect(result.toolCall.name).toBe("read");
+		expect(result.toolCall.arguments).toEqual({ path: "package.json" });
+	});
+
+	it("accepts malformed start tag arguments containing braces and greater-than signs", () => {
+		const result = extractTextToolCall(
+			'<tool_call{"name":"write","arguments":{"path":"/tmp/a","content":"a > b { ok }"}}>',
+		);
+
+		expect(result.kind).toBe("accepted");
+		if (result.kind !== "accepted") throw new Error("expected accepted result");
+		expect(result.toolCall.arguments).toEqual({ path: "/tmp/a", content: "a > b { ok }" });
+	});
+
+	it("accepts a malformed start tag followed directly by a closing tag", () => {
+		const result = extractTextToolCall(
+			'<tool_call{"arguments":{"path":"/tmp/a","content":"ok"},"name":"write"}</tool_call>',
+		);
+
+		expect(result.kind).toBe("accepted");
+		if (result.kind !== "accepted") throw new Error("expected accepted result");
+		expect(result.toolCall.name).toBe("write");
+		expect(result.toolCall.arguments).toEqual({ path: "/tmp/a", content: "ok" });
+	});
+
+	it("accepts a malformed start tag with an extra angle before JSON", () => {
+		const result = extractTextToolCall('<tool_call<{"name":"bash","arguments":{"command":"true"}}>');
+
+		expect(result.kind).toBe("accepted");
+		if (result.kind !== "accepted") throw new Error("expected accepted result");
+		expect(result.toolCall.name).toBe("bash");
+		expect(result.toolCall.arguments).toEqual({ command: "true" });
+	});
+
+	it("accepts malformed start tags with extra trailing braces", () => {
+		const withClose = extractTextToolCall('<tool_call{"name":"find","arguments":{"pattern":"*.md"}}} />');
+		const withoutClose = extractTextToolCall('<tool_call{"name":"ls","arguments":{}}}');
+
+		expect(withClose.kind).toBe("accepted");
+		expect(withoutClose.kind).toBe("accepted");
+		if (withClose.kind !== "accepted" || withoutClose.kind !== "accepted") {
+			throw new Error("expected accepted results");
+		}
+		expect(withClose.toolCall.name).toBe("find");
+		expect(withoutClose.toolCall.name).toBe("ls");
+	});
+
+	it("accepts pipe-delimited call syntax", () => {
+		const result = extractTextToolCall(
+			`<|tool_call>call:bash{command:"printf 'ok' > /tmp/out",timeout:5}<tool_call|>`,
+		);
+
+		expect(result.kind).toBe("accepted");
+		if (result.kind !== "accepted") throw new Error("expected accepted result");
+		expect(result.toolCall.name).toBe("bash");
+		expect(result.toolCall.arguments).toEqual({ command: "printf 'ok' > /tmp/out", timeout: 5 });
+	});
+
+	it("accepts parenthesized tool_call JSON", () => {
+		const result = extractTextToolCall('(tool_call {"name":"write","arguments":{"path":"/tmp/a","content":"ok"}})');
+
+		expect(result.kind).toBe("accepted");
+		if (result.kind !== "accepted") throw new Error("expected accepted result");
+		expect(result.toolCall.name).toBe("write");
+		expect(result.toolCall.arguments).toEqual({ path: "/tmp/a", content: "ok" });
+	});
+
+	it("accepts fenced tool_call JSON", () => {
+		const result = extractTextToolCall(
+			'```tool_call\n{"name":"grep","arguments":{"path":"/tmp/a","pattern":"needle","literal":true,"limit":5}}\n```',
+		);
+
+		expect(result.kind).toBe("accepted");
+		if (result.kind !== "accepted") throw new Error("expected accepted result");
+		expect(result.toolCall.name).toBe("grep");
+		expect(result.toolCall.arguments).toEqual({ path: "/tmp/a", pattern: "needle", literal: true, limit: 5 });
+	});
+
+	it("accepts slash-prefixed tool_call JSON", () => {
+		const result = extractTextToolCall('/tool_call{"name":"ls","arguments":{"path":"/tmp/a","limit":20}}');
+
+		expect(result.kind).toBe("accepted");
+		if (result.kind !== "accepted") throw new Error("expected accepted result");
+		expect(result.toolCall.name).toBe("ls");
+		expect(result.toolCall.arguments).toEqual({ path: "/tmp/a", limit: 20 });
+	});
+
+	it("accepts XML-style tool_call name attribute with JSON body arguments", () => {
+		const result = extractTextToolCall('<tool_call name="write">\n{"path":"/tmp/a","content":"ok"}\n</tool_call>');
+
+		expect(result.kind).toBe("accepted");
+		if (result.kind !== "accepted") throw new Error("expected accepted result");
+		expect(result.toolCall.name).toBe("write");
+		expect(result.toolCall.arguments).toEqual({ path: "/tmp/a", content: "ok" });
+	});
+
+	it("accepts XML-style tool_call name and arguments attributes", () => {
+		const result = extractTextToolCall(
+			'<tool_call name="edit" arguments={"path":"/tmp/a","edits":[{"oldText":"a","newText":"b"}]}></tool_call>',
+		);
+
+		expect(result.kind).toBe("accepted");
+		if (result.kind !== "accepted") throw new Error("expected accepted result");
+		expect(result.toolCall.name).toBe("edit");
+		expect(result.toolCall.arguments).toEqual({ path: "/tmp/a", edits: [{ oldText: "a", newText: "b" }] });
+	});
+
+	it("uses a default tool name and merges top-level arguments when provided", () => {
+		const result = extractTextToolCall('<tool_call{"arguments":{"oldText":"a","newText":"b"},"path":"/tmp/a"}>', {
+			defaultName: "edit",
+		});
+
+		expect(result.kind).toBe("accepted");
+		if (result.kind !== "accepted") throw new Error("expected accepted result");
+		expect(result.toolCall.name).toBe("edit");
+		expect(result.toolCall.arguments).toEqual({ oldText: "a", newText: "b", path: "/tmp/a" });
+	});
+
 	it("returns none when there is no candidate", () => {
 		expect(extractTextToolCall("plain text")).toEqual({ kind: "none", diagnostics: [] });
 	});
@@ -79,6 +240,41 @@ describe("findToolCallSpan", () => {
 		expect(text.slice(span.start, span.end)).toBe(
 			'<tool_call>{"name":"read","arguments":{"path":"package.json"}}</tool_call>',
 		);
+		expect(text.slice(0, span.start)).toBe("before ");
+		expect(text.slice(span.end)).toBe(" after");
+	});
+
+	it("returns the offsets of a malformed start tag tool call", () => {
+		const text = 'before <tool_call{"arguments":{"path":"package.json"},"name":"read"}> after';
+		const span = findToolCallSpan(text);
+
+		expect(span).not.toBeNull();
+		if (!span) throw new Error("expected a span");
+		expect(text.slice(span.start, span.end)).toBe('<tool_call{"arguments":{"path":"package.json"},"name":"read"}>');
+		expect(text.slice(0, span.start)).toBe("before ");
+		expect(text.slice(span.end)).toBe(" after");
+	});
+
+	it("returns the offsets of malformed start tag variants", () => {
+		const text = 'before <tool_call{"arguments":{"path":"/tmp/a","content":"ok"},"name":"write"}</tool_call> after';
+		const span = findToolCallSpan(text);
+
+		expect(span).not.toBeNull();
+		if (!span) throw new Error("expected a span");
+		expect(text.slice(span.start, span.end)).toBe(
+			'<tool_call{"arguments":{"path":"/tmp/a","content":"ok"},"name":"write"}</tool_call>',
+		);
+		expect(text.slice(0, span.start)).toBe("before ");
+		expect(text.slice(span.end)).toBe(" after");
+	});
+
+	it("returns the offsets of XML-style tool call variants", () => {
+		const text = 'before <tool_call name="read" arguments={"path":"/tmp/a"}> after';
+		const span = findToolCallSpan(text);
+
+		expect(span).not.toBeNull();
+		if (!span) throw new Error("expected a span");
+		expect(text.slice(span.start, span.end)).toBe('<tool_call name="read" arguments={"path":"/tmp/a"}>');
 		expect(text.slice(0, span.start)).toBe("before ");
 		expect(text.slice(span.end)).toBe(" after");
 	});
