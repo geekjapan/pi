@@ -16,6 +16,8 @@
 		"build:ci": "cd packages/tui && npm run build && cd ../ai && tsgo -p tsconfig.build.json && cd ../agent && npm run build && cd ../coding-agent && npm run build && cd ../orchestrator && npm run build",
 		"check": "biome check --write --error-on-warnings . && npm run check:pinned-deps && npm run check:ts-imports && npm run check:shrinkwrap && npm run check:install-lock:coding-agent && tsgo --noEmit && npm run check:browser-smoke",
 		"check:browser-smoke": "node scripts/check-browser-smoke.mjs",
+		"e2e": "node scripts/e2e/run-e2e.mjs",
+		"e2e:critical": "node scripts/e2e/run-e2e.mjs --critical",
 		"check:pinned-deps": "node scripts/check-pinned-deps.mjs",
 		"check:shrinkwrap": "node scripts/generate-coding-agent-shrinkwrap.mjs --check",
 		"check:install-lock:coding-agent": "node scripts/generate-coding-agent-install-lock.mjs --check",
