@@ -57,6 +57,34 @@ DOGFOOD_ROOT="${DOGFOOD_ROOT:-$HOME/opt/pi-dogfood}"
 RELEASE_DIR="$DOGFOOD_ROOT/releases/$COMMIT_SHA"
 CURRENT_LINK="$DOGFOOD_ROOT/current"
 
+generate_wrappers() {
+	local bin_dir="$DOGFOOD_ROOT/bin"
+	mkdir -p "$bin_dir"
+
+	cat > "$bin_dir/pi-dog" <<WRAPPER
+#!/usr/bin/env bash
+set -euo pipefail
+export PI_CODING_AGENT_DIR="\${PI_CODING_AGENT_DIR:-\$HOME/.config/pi-dogfood}"
+exec "$DOGFOOD_ROOT/current/pi" "\$@"
+WRAPPER
+
+	cat > "$bin_dir/pi-text" <<WRAPPER
+#!/usr/bin/env bash
+set -euo pipefail
+export PI_CODING_AGENT_DIR="\${PI_CODING_AGENT_DIR:-\$HOME/.config/pi-dogfood}"
+exec "$DOGFOOD_ROOT/current/pi" --tool-protocol text "\$@"
+WRAPPER
+
+	cat > "$bin_dir/pi-auto" <<WRAPPER
+#!/usr/bin/env bash
+set -euo pipefail
+export PI_CODING_AGENT_DIR="\${PI_CODING_AGENT_DIR:-\$HOME/.config/pi-dogfood}"
+exec "$DOGFOOD_ROOT/current/pi" --tool-protocol auto "\$@"
+WRAPPER
+
+	chmod +x "$bin_dir/pi-dog" "$bin_dir/pi-text" "$bin_dir/pi-auto"
+}
+
 if [[ -e "$RELEASE_DIR" ]]; then
 	if [[ "$FORCE" != "true" ]]; then
 		echo "Already deployed: $COMMIT_SHA"
@@ -100,6 +128,7 @@ BRANCH=$BRANCH
 INFO
 
 ln -sfn "$RELEASE_DIR" "$CURRENT_LINK"
+generate_wrappers
 
 echo "Deployed Pi dogfood:"
 echo "  Commit:  $COMMIT_FULL"
